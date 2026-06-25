@@ -18,8 +18,9 @@ def main() -> None:
     logger.info("starting watercolor-tutor model=%s", settings.model)
 
     graph = compile_graph()
-    # Start with empty state; the welcome node produces the first message.
-    result = graph.invoke({"messages": [], "step": 0})
+    # Start with empty state; `welcome` greets and sets step=1, then `teach`
+    # produces the first lesson. (Step 1 is materials & setup.)
+    result = graph.invoke({"messages": [], "step": 0, "awaiting_question": False})
 
     for message in result["messages"]:
         # Messages may be dicts (our seed) or LangChain message objects later.

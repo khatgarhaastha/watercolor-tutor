@@ -9,7 +9,7 @@ from watercolor_tutor.state import TutorState
 
 def test_tutor_state_has_expected_keys() -> None:
     # TypedDict exposes its declared fields via __annotations__.
-    assert set(TutorState.__annotations__) == {"messages", "step"}
+    assert set(TutorState.__annotations__) == {"messages", "step", "awaiting_question"}
 
 
 def test_add_messages_reducer_appends() -> None:

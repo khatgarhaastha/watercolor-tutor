@@ -19,7 +19,11 @@ class TutorState(TypedDict):
             messages (and de-duplicates by id) rather than replacing the list.
         step: Which step of the lesson the learner is on. A plain int, so the
             default reducer applies — a node's value simply overwrites it.
+        awaiting_question: True once a step has been taught and we're waiting on
+            the learner to either ask a question or signal they're ready to move
+            on. The router (added in a later slice) reads this to decide flow.
     """
 
     messages: Annotated[list, add_messages]
     step: int
+    awaiting_question: bool
