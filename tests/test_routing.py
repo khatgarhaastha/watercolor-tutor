@@ -18,6 +18,10 @@ def test_is_ready_signal_detects_ready_phrases() -> None:
     assert is_ready_signal("I'm ready")
     assert is_ready_signal("next please")
     assert is_ready_signal("Got it, thanks!")
+    # Broadened keywords so a demo feels less brittle.
+    assert is_ready_signal("all set")
+    assert is_ready_signal("i'm good")
+    assert is_ready_signal("sounds good, let's go")
 
 
 def test_is_ready_signal_false_for_questions_and_statements() -> None:

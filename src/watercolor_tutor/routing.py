@@ -33,6 +33,10 @@ READY_SIGNALS = (
     "let's go",
     "lets go",
     "done",
+    "i'm good",
+    "im good",
+    "all set",
+    "sounds good",
 )
 
 

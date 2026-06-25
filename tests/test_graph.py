@@ -5,6 +5,8 @@ so invoking the graph never calls the real Anthropic API.
 """
 
 import pytest
+from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 
 from watercolor_tutor.graph import compile_graph
 from watercolor_tutor.nodes.welcome import welcome
@@ -27,19 +29,41 @@ def test_welcome_node_returns_partial_update(initial_state: TutorState) -> None:
     assert "Welcome" in update["messages"][0]["content"]
 
 
-def test_graph_compiles_and_invokes(
+def test_interactive_lesson_flow(
     initial_state: TutorState, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Stub the LLM so the teach node returns canned text instead of calling out.
-    monkeypatch.setattr("watercolor_tutor.llm.generate", lambda *_: "Here is your lesson.")
+    """Drive the full pause/resume loop offline using Command(resume=...).
 
+    No real input() and no real LLM — Command(resume=text) supplies what the
+    learner would type, and the stubbed generate() stands in for Claude. This is
+    the payoff of the interrupt + checkpointer design: the whole conversation is
+    testable without a human or the network.
+    """
+    monkeypatch.setattr("watercolor_tutor.llm.generate", lambda *_: "LESSON")
     graph = compile_graph()
-    result = graph.invoke(initial_state)
+    config: RunnableConfig = {"configurable": {"thread_id": "test"}}
 
-    # welcome greets and sets step=1; teach delivers the lesson and waits.
-    assert result["step"] == 1
-    assert result["awaiting_question"] is True
+    # Kick off: welcome + teach step 1, then pause at await_learner.
+    state = graph.invoke(initial_state, config=config)
+    assert state["step"] == 1
+    assert graph.get_state(config).next  # non-empty => paused, awaiting input
 
-    contents = [_content(m) for m in result["messages"]]
+    # A question routes to `answer` and pauses again, still on step 1.
+    state = graph.invoke(Command(resume="what brush should I use?"), config=config)
+    assert state["step"] == 1
+    assert graph.get_state(config).next
+
+    # "ready" advances to step 2, then 3 (more steps remain each time).
+    state = graph.invoke(Command(resume="ready"), config=config)
+    assert state["step"] == 2
+    state = graph.invoke(Command(resume="all set"), config=config)
+    assert state["step"] == 3
+
+    # "ready" on the final step ends the lesson — the graph is no longer paused.
+    state = graph.invoke(Command(resume="i'm good"), config=config)
+    assert not graph.get_state(config).next
+
+    # The transcript should contain the greeting and the taught lessons.
+    contents = [_content(m) for m in state["messages"]]
     assert any("Welcome" in c for c in contents)
-    assert any("Here is your lesson." in c for c in contents)
+    assert contents.count("LESSON") >= 3  # one lesson per step
