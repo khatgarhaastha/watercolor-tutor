@@ -44,3 +44,7 @@ STEP_PROMPTS: dict[int, str] = {
         "overlapping strokes from top to bottom. Remind them to let it dry flat."
     ),
 }
+
+# How many steps the v0 lesson has. Derived from STEP_PROMPTS so it stays correct
+# if we add a step. The router uses this to know when the lesson is complete.
+TOTAL_STEPS = len(STEP_PROMPTS)
