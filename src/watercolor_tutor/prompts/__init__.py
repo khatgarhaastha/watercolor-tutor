@@ -7,22 +7,37 @@ WELCOME_MESSAGE = (
     "first simple wash. Ready when you are!"
 )
 
+# Human-readable titles for each step. This is the single source of truth for
+# the lesson's shape — the system prompt and the router both derive from it.
+STEP_TITLES: dict[int, str] = {
+    1: "Materials & setup",
+    2: "Basic brush control",
+    3: "Your first simple wash",
+}
+
+# How many steps the v0 lesson has. Derived from STEP_TITLES so it stays correct
+# if we add a step. The router uses this to know when the lesson is complete.
+TOTAL_STEPS = len(STEP_TITLES)
+
+# A compact outline of the whole lesson, embedded in the system prompt so the
+# model always knows the fixed structure — and, crucially, that there is no step
+# beyond the last one (otherwise it tends to invent a "Step 4").
+_LESSON_OUTLINE = "; ".join(f"Step {n}: {title}" for n, title in STEP_TITLES.items())
+
 # The tutor's persona, sent as the `system` prompt on every Claude call. The
 # system prompt shapes HOW the model responds across the whole conversation.
 SYSTEM_PROMPT = (
     "You are a warm, patient watercolor instructor guiding an absolute beginner "
     "through their very first painting. Teach one small step at a time in plain, "
     "encouraging language. Keep each reply short — a few sentences. Avoid jargon; "
-    "if you must use a term, explain it simply. End by inviting the learner to "
-    "ask a question or tell you they're ready to continue."
+    "if you must use a term, explain it simply.\n"
+    f"This is a fixed {TOTAL_STEPS}-step first lesson — {_LESSON_OUTLINE}. "
+    f"There is no step beyond Step {TOTAL_STEPS}; never invent or reference a later "
+    "step. On any step before the last, end by inviting the learner to ask a "
+    f"question or say they're ready to continue. On Step {TOTAL_STEPS} (the last "
+    "one), after teaching, congratulate them on finishing their first lesson and "
+    "invite any final questions — do not point them toward a next step."
 )
-
-# Human-readable titles for each step (handy for logs and UI).
-STEP_TITLES: dict[int, str] = {
-    1: "Materials & setup",
-    2: "Basic brush control",
-    3: "Your first simple wash",
-}
 
 # What the tutor should cover at each step. The `teach` node sends the matching
 # entry to Claude as the user turn; the model turns it into a friendly lesson.
@@ -39,12 +54,10 @@ STEP_PROMPTS: dict[int, str] = {
         "suggest one tiny practice exercise on scrap paper."
     ),
     3: (
-        "Teach Step 3 — Your first simple wash. Walk them through painting a flat "
-        "wash: mixing paint with water, loading the brush, and laying smooth "
-        "overlapping strokes from top to bottom. Remind them to let it dry flat."
+        "Teach Step 3 — Your first simple wash. This is the FINAL step of the "
+        "lesson. Walk them through painting a flat wash: mixing paint with water, "
+        "loading the brush, and laying smooth overlapping strokes from top to "
+        "bottom. Remind them to let it dry flat. Then congratulate them on "
+        "completing their first watercolor lesson — do not mention any further step."
     ),
 }
-
-# How many steps the v0 lesson has. Derived from STEP_PROMPTS so it stays correct
-# if we add a step. The router uses this to know when the lesson is complete.
-TOTAL_STEPS = len(STEP_PROMPTS)

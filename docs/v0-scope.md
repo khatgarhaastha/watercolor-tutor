@@ -31,6 +31,18 @@ by conditional edges.
 | **RAG** (retrieval over a knowledge base of techniques) | The 3-step beginner content fits in prompts; no corpus to retrieve over yet. Revisit when curriculum grows. |
 | **MCP** (external tools/data via Model Context Protocol) | v0 needs no external tools or live data; introduce only when a real integration earns it. |
 
+## Known limitations (v0)
+
+- **The keyword router can't handle a mixed reply.** If a single message is BOTH
+  a ready-signal and a question — e.g. *"let's move on, what should I paint?"* —
+  the keyword heuristic matches the ready-signal, routes to `advance`, and the
+  question is silently dropped (never answered). This is inherent to a keyword
+  classifier: it picks one path and can't recognize that the learner wanted both.
+  We accept this for v0 to avoid adding branching complexity. The planned
+  **LLM-based intent classifier** (see "adaptive / branching difficulty" above)
+  resolves it by understanding intent — it could answer the question first, then
+  advance — and is the natural place to fix this.
+
 ## Note
 
 These deferrals are deliberate, not oversights. v0 is intentionally the minimal
