@@ -14,6 +14,7 @@ def test_classify_node_writes_intent_to_state(monkeypatch: pytest.MonkeyPatch) -
         step=1,
         awaiting_question=True,
         intent="",
+        image_path="",
     )
 
     update = classify(state)

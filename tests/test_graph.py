@@ -4,6 +4,9 @@ These run fully offline: the welcome node is deterministic, and we stub the LLM
 so invoking the graph never calls the real Anthropic API.
 """
 
+import base64
+from pathlib import Path
+
 import pytest
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
@@ -11,6 +14,10 @@ from langgraph.types import Command
 from watercolor_tutor.graph import compile_graph
 from watercolor_tutor.nodes.welcome import welcome
 from watercolor_tutor.state import TutorState
+
+_PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+)
 
 
 def _content(message: object) -> str:
@@ -160,3 +167,35 @@ def test_full_intent_set_with_navigation_bounds(
     # ready on the last step ends the lesson
     resume("ok I'm ready to finish")
     assert not graph.get_state(config).next
+
+
+def test_vision_feedback_flow(
+    initial_state: TutorState, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Sharing an image routes to vision_feedback (bypassing classify), stays on
+    the current step, and clears the image — then normal replies classify again.
+    """
+    monkeypatch.setattr("watercolor_tutor.llm.generate", lambda *_: "LESSON")
+    monkeypatch.setattr("watercolor_tutor.llm.see", lambda *a, **k: "Nice even wash!")
+    monkeypatch.setattr("watercolor_tutor.classifier.classify_intent", lambda _t: "question")
+    image = tmp_path / "wash.png"
+    image.write_bytes(_PNG_1X1)
+
+    graph = compile_graph()
+    config: RunnableConfig = {"configurable": {"thread_id": "vision"}}
+    graph.invoke(initial_state, config=config)  # teach step 1, pause
+
+    # Share an image -> vision_feedback (not classify).
+    state = graph.invoke(
+        Command(resume={"text": "how's this?", "image_path": str(image)}), config=config
+    )
+    contents = [_content(m) for m in state["messages"]]
+    assert any("Nice even wash!" in c for c in contents)  # vision feedback appended
+    assert state["step"] == 1  # stayed on the current step
+    assert state["image_path"] == ""  # image consumed/cleared
+    assert graph.get_state(config).next  # paused again
+
+    # A normal text reply still goes through classify -> answer.
+    state = graph.invoke(Command(resume="what brush?"), config=config)
+    assert state["step"] == 1
+    assert graph.get_state(config).next

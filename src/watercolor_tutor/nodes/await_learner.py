@@ -23,8 +23,17 @@ def await_learner(state: TutorState) -> dict:
     logger.info("awaiting learner reply at step=%s", state["step"])
 
     # Execution suspends HERE until the caller resumes with Command(resume=...).
-    # On resume, `interrupt` returns the value that was passed in — the learner's
-    # text — which we then append to the conversation as a "user" message. The
-    # router (the conditional edge) reads this to decide what happens next.
+    # On resume, `interrupt` returns the value passed in. The CLI sends either a
+    # plain string (a typed reply) or a dict (a /feedback command carrying an
+    # image path). We normalize both into a user message — and, for an image,
+    # also write image_path so route_after_reply sends us to vision_feedback.
     reply = interrupt("Awaiting the learner's reply")
+
+    if isinstance(reply, dict):
+        text = reply.get("text") or "[shared a photo of my painting]"
+        update: dict = {"messages": [{"role": "user", "content": text}]}
+        if reply.get("image_path"):
+            update["image_path"] = reply["image_path"]
+        return update
+
     return {"messages": [{"role": "user", "content": reply}]}

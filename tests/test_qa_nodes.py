@@ -8,7 +8,9 @@ from watercolor_tutor.state import TutorState
 
 
 def _state(messages: list, step: int = 1) -> TutorState:
-    return TutorState(messages=messages, step=step, awaiting_question=True, intent="")
+    return TutorState(
+        messages=messages, step=step, awaiting_question=True, intent="", image_path=""
+    )
 
 
 def test_answer_replies_and_keeps_awaiting(monkeypatch: pytest.MonkeyPatch) -> None:

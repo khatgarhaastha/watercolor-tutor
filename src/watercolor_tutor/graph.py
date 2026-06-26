@@ -4,11 +4,12 @@ This module is WIRING ONLY. Reading it should explain the whole agent at a
 glance: which nodes exist and how control flows between them. The actual work
 lives in `nodes/`.
 
-Current shape (v1, full intent set):
+Current shape (v2, full intent set + vision feedback):
 
-    START -> welcome -> teach -> await_learner -> classify -[route_after_input]-> ...
+    START -> welcome -> teach -> await_learner -[route_after_reply]-> ...
 
-    route_after_input (on intent):
+    route_after_reply:  image attached -> vision_feedback ;  else -> classify
+    classify -[route_after_input]-> (on intent):
         ready       -> advance   (or END on the last step)
         skip_ahead  -> advance   (or respond, if already on the last step)
         go_back     -> go_back    (or respond, if already on the first step)
@@ -16,13 +17,11 @@ Current shape (v1, full intent set):
         question,both -> answer
         off_topic, sharing_progress -> respond
     answer  -[route_after_answer]-> both -> advance/END | question -> await_learner
-    advance -> teach     go_back -> teach     reexplain -> await_learner
-    respond -> await_learner
+    advance -> teach     go_back -> teach     reexplain/respond/vision_feedback -> await_learner
 
-`classify` runs the LLM intent classifier and writes `intent` to state; the pure
-routers act on it. Navigation bounds live in route_after_input: a blocked skip or
-go_back is sent to `respond` for a graceful boundary message rather than running
-off the ends of the 3-step lesson.
+`vision_feedback` looks at a shared image in the context of the current step. The
+image's presence (set by await_learner from a /feedback command) is the routing
+signal — no classifier intent needed, so the v1 machinery is untouched.
 """
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -37,8 +36,9 @@ from .nodes.go_back import go_back
 from .nodes.reexplain import reexplain
 from .nodes.respond import respond
 from .nodes.teach import teach
+from .nodes.vision_feedback import vision_feedback
 from .nodes.welcome import welcome
-from .routing import route_after_answer, route_after_input
+from .routing import route_after_answer, route_after_input, route_after_reply
 from .state import TutorState
 
 
@@ -58,12 +58,18 @@ def build_graph() -> StateGraph:
     builder.add_node("go_back", go_back)
     builder.add_node("reexplain", reexplain)
     builder.add_node("respond", respond)
+    builder.add_node("vision_feedback", vision_feedback)
 
     builder.add_edge(START, "welcome")
     builder.add_edge("welcome", "teach")
     builder.add_edge("teach", "await_learner")
-    # After the learner replies, classify their intent before deciding flow.
-    builder.add_edge("await_learner", "classify")
+    # After the learner replies, fork: a shared image goes to vision_feedback;
+    # any other reply goes to classify for the usual intent routing.
+    builder.add_conditional_edges(
+        "await_learner",
+        route_after_reply,
+        {"classify": "classify", "vision_feedback": "vision_feedback"},
+    )
 
     # First conditional edge: route on the classified intent. The path_map
     # translates each string key to a node — and "end" to LangGraph's END
@@ -95,6 +101,7 @@ def build_graph() -> StateGraph:
     builder.add_edge("go_back", "teach")
     builder.add_edge("reexplain", "await_learner")
     builder.add_edge("respond", "await_learner")
+    builder.add_edge("vision_feedback", "await_learner")
     return builder
 
 

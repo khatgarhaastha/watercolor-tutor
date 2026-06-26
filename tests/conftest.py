@@ -12,7 +12,7 @@ from watercolor_tutor.state import TutorState
 @pytest.fixture
 def initial_state() -> TutorState:
     """A fresh, empty tutor state as the graph would be invoked with."""
-    return TutorState(messages=[], step=0, awaiting_question=False, intent="")
+    return TutorState(messages=[], step=0, awaiting_question=False, intent="", image_path="")
 
 
 @pytest.fixture

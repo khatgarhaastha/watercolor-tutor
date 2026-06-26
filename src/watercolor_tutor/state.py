@@ -23,13 +23,19 @@ class TutorState(TypedDict):
             the learner to either ask a question or signal they're ready to move
             on. The router (added in a later slice) reads this to decide flow.
         intent: The learner's classified intent for their latest message
-            ("question" | "ready" | "both"). Written by the `classify` node and
+            (see classifier.IntentResult). Written by the `classify` node and
             read by the pure routers — this is how the LLM's understanding of the
             reply is carried from the node that decides it to the edges that act
             on it. Empty string before any classification has run.
+        image_path: Path to an image the learner just shared for feedback (set by
+            await_learner from a /feedback command, consumed and cleared by the
+            vision_feedback node). Empty string when no image is pending. Note we
+            keep only the PATH here, never the base64 bytes — those go straight
+            into a one-off vision call and never into the conversation history.
     """
 
     messages: Annotated[list, add_messages]
     step: int
     awaiting_question: bool
     intent: str
+    image_path: str

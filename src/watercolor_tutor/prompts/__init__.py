@@ -117,3 +117,20 @@ RESPONSE_INSTRUCTIONS: dict[str, str] = {
         "nothing before it. Reassure them warmly and carry on with this step."
     ),
 }
+
+# What to look for when giving vision feedback on each step's painting. This is
+# what anchors the critique to the CURRENT step instead of generic praise.
+FEEDBACK_FOCUS: dict[int, str] = {
+    1: "materials & setup — appropriate supplies, paper taped flat, a sensible workspace",
+    2: "brush control — line consistency, pressure variation (thin vs thick), steadiness",
+    3: "the flat wash — smoothness, even saturation, streaks, hard edges, and blooms",
+}
+
+# Prompt for the vision feedback call. The vision_feedback node fills in the
+# learner's CURRENT step, its title, and the focus above.
+VISION_FEEDBACK_INSTRUCTION = (
+    "The learner shares a photo of their watercolor work for Step {step}: {title}. "
+    "Give specific, encouraging, step-anchored feedback. Focus on: {focus}. Name "
+    "one thing that's working well and one concrete thing to improve. Avoid "
+    "generic praise — ground every comment in what you actually see in the image."
+)

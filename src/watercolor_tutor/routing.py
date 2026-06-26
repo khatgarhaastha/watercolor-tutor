@@ -106,6 +106,19 @@ def _advance_or_end(step: int) -> Literal["advance", "end"]:
     return "advance" if can_advance(step) else "end"
 
 
+def route_after_reply(state: TutorState) -> Literal["classify", "vision_feedback"]:
+    """First fork after the learner replies (pure: reads only image_path).
+
+    An attached image is an unambiguous request for feedback, so it routes
+    straight to vision_feedback — we don't need the classifier in that case. Any
+    other reply goes to `classify` for the usual intent routing.
+    """
+    if state["image_path"]:
+        logger.info("router: image attached -> vision_feedback")
+        return "vision_feedback"
+    return "classify"
+
+
 def route_after_input(
     state: TutorState,
 ) -> Literal["answer", "advance", "go_back", "reexplain", "respond", "end"]:

@@ -86,3 +86,37 @@ def parse(system: str, messages: list[dict[str, str]], schema: type[T]) -> T:
     if parsed is None:
         raise ValueError("structured output returned no parsed result")
     return parsed
+
+
+def see(system: str, image_b64: str, media_type: str, prompt: str) -> str:
+    """Send one image plus a text prompt to Claude and return its text reply.
+
+    A standalone multimodal call: the image goes in its own content block placed
+    BEFORE the text (the recommended ordering — Claude "looks before it reads").
+    The base64 bytes live only in this request; we never store them in the
+    conversation state, so multi-turn cost stays flat.
+    """
+    client = get_client()
+    settings = get_settings()
+    logger.debug("vision call model=%s media_type=%s", settings.model, media_type)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": image_b64},
+                },
+                {"type": "text", "text": prompt},
+            ],
+        }
+    ]
+    response = client.messages.create(
+        model=settings.model,
+        max_tokens=MAX_TOKENS,
+        system=system,
+        messages=cast(list[MessageParam], messages),
+    )
+
+    return "".join(getattr(block, "text", "") for block in response.content)

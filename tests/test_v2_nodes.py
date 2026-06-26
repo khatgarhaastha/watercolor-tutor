@@ -14,6 +14,7 @@ def _state(step: int = 2, intent: str = "", messages: list | None = None) -> Tut
         step=step,
         awaiting_question=True,
         intent=intent,
+        image_path="",
     )
 
 

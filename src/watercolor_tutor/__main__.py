@@ -13,9 +13,12 @@ The pause/resume rhythm:
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
+from . import images
 from .config import get_settings
 from .graph import compile_graph
 from .logging_config import configure_logging, get_logger
+
+FEEDBACK_COMMAND = "/feedback"
 
 
 def _print_new_assistant_messages(messages: list, already_printed: int) -> int:
@@ -33,6 +36,19 @@ def _print_new_assistant_messages(messages: list, already_printed: int) -> int:
     return len(messages)
 
 
+def _parse_feedback_command(line: str) -> tuple[str, str] | None:
+    """If `line` is a /feedback command, return (image_path, message); else None.
+
+    Usage: `/feedback <path> [optional message]`. Pure string parsing — the path
+    is validated separately so this stays trivially testable.
+    """
+    if not line.startswith(FEEDBACK_COMMAND):
+        return None
+    rest = line[len(FEEDBACK_COMMAND) :].strip()
+    path, _, message = rest.partition(" ")
+    return path, message.strip()
+
+
 def main() -> None:
     """Run the interactive watercolor lesson."""
     settings = get_settings()
@@ -47,9 +63,11 @@ def main() -> None:
 
     # Kick off: welcome + teach step 1, then the graph pauses at await_learner.
     state = graph.invoke(
-        {"messages": [], "step": 0, "awaiting_question": False, "intent": ""}, config=config
+        {"messages": [], "step": 0, "awaiting_question": False, "intent": "", "image_path": ""},
+        config=config,
     )
     printed = _print_new_assistant_messages(state["messages"], 0)
+    print("\n(Tip: share your painting for feedback with  /feedback <path-to-image>)")
 
     # Loop as long as the graph is paused waiting on the learner. An empty
     # `.next` means the graph reached END — the lesson is complete.
@@ -61,8 +79,21 @@ def main() -> None:
             return
         if not reply:
             continue
-        # Resume the paused graph, feeding `reply` into await_learner's interrupt().
-        state = graph.invoke(Command(resume=reply), config=config)
+
+        feedback = _parse_feedback_command(reply)
+        if feedback is not None:
+            path, message = feedback
+            try:
+                images.load_image(path)  # validate now; show a friendly error if bad
+            except (ValueError, OSError) as exc:
+                print(f"\nCouldn't use that image: {exc}")
+                continue
+            resume: object = {"text": message, "image_path": path}
+        else:
+            resume = reply
+
+        # Resume the paused graph, feeding the reply into await_learner's interrupt().
+        state = graph.invoke(Command(resume=resume), config=config)
         printed = _print_new_assistant_messages(state["messages"], printed)
 
     print("\n🎉 That's your first watercolor lesson — happy painting!")

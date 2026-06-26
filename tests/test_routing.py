@@ -15,12 +15,21 @@ from watercolor_tutor.routing import (
     last_user_message,
     route_after_answer,
     route_after_input,
+    route_after_reply,
 )
 from watercolor_tutor.state import TutorState
 
 
-def _state(messages: list | None = None, step: int = 1, intent: str = "") -> TutorState:
-    return TutorState(messages=messages or [], step=step, awaiting_question=True, intent=intent)
+def _state(
+    messages: list | None = None, step: int = 1, intent: str = "", image_path: str = ""
+) -> TutorState:
+    return TutorState(
+        messages=messages or [],
+        step=step,
+        awaiting_question=True,
+        intent=intent,
+        image_path=image_path,
+    )
 
 
 def test_is_ready_signal_detects_ready_phrases() -> None:
@@ -74,6 +83,17 @@ def test_clamp_step_bounds() -> None:
     assert clamp_step(0) == 1  # below the floor
     assert clamp_step(4) == 3  # above the ceiling (TOTAL_STEPS)
     assert clamp_step(2) == 2  # in range, unchanged
+
+
+# --- route_after_reply: image presence fork ---------------------------------
+
+
+def test_route_after_reply_with_image_goes_to_vision() -> None:
+    assert route_after_reply(_state(image_path="/tmp/wash.png")) == "vision_feedback"
+
+
+def test_route_after_reply_without_image_classifies() -> None:
+    assert route_after_reply(_state(image_path="")) == "classify"
 
 
 # --- route_after_input: reads state["intent"] -------------------------------
