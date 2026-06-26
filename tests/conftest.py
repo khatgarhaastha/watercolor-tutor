@@ -16,6 +16,17 @@ def initial_state() -> TutorState:
 
 
 @pytest.fixture
+def stub_grounding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable RAG grounding so flow/node tests stay fully offline.
+
+    Real retrieval loads the embedding model (a one-time download); flow tests
+    that only exercise control flow don't need it. Tests that PROVE grounding
+    (test_knowledge, test_grounding) deliberately don't use this fixture.
+    """
+    monkeypatch.setattr("watercolor_tutor.retrieval.grounding_for", lambda *a, **k: "")
+
+
+@pytest.fixture
 def fake_llm():
     """A stand-in for the Anthropic client.
 

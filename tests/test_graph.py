@@ -19,6 +19,10 @@ _PNG_1X1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
 )
 
+# Flow tests exercise routing, not RAG — keep grounding stubbed off so teach/
+# reexplain don't load the embedding model. (Grounding is proven in test_grounding.)
+pytestmark = pytest.mark.usefixtures("stub_grounding")
+
 
 def _content(message: object) -> str:
     """Read a message's text whether it's a dict or a LangChain message object.

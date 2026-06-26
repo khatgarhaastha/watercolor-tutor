@@ -7,7 +7,7 @@ all the "intelligence" lives in the prompt and the model. That separation —
 small nodes, prompts carry the work — is a core agentic-design idea.
 """
 
-from .. import llm
+from .. import llm, retrieval
 from ..logging_config import get_logger
 from ..prompts import STEP_PROMPTS, STEP_TITLES, SYSTEM_PROMPT
 from ..state import TutorState
@@ -24,10 +24,14 @@ def teach(state: TutorState) -> dict:
     step = state["step"]
     logger.info("teaching step=%s title=%r", step, STEP_TITLES.get(step))
 
-    # Send a single user turn: the instruction for this step. (Conversation
-    # context for follow-up questions is threaded in a later slice.) The first
-    # message must use the "user" role — an Anthropic API requirement.
-    messages = [{"role": "user", "content": STEP_PROMPTS[step]}]
+    # RAG: pull step-relevant notes from the technique corpus and ask the model to
+    # ground its explanation in them (specific ratios, named techniques) rather
+    # than relying on its own memory. grounding_for returns "" if nothing matches.
+    grounding = retrieval.grounding_for(step, STEP_PROMPTS[step])
+    instruction = STEP_PROMPTS[step] + (f"\n\n{grounding}" if grounding else "")
+
+    # Send a single user turn. The first message must use the "user" role.
+    messages = [{"role": "user", "content": instruction}]
     lesson = llm.generate(SYSTEM_PROMPT, messages)
 
     return {

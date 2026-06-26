@@ -7,6 +7,10 @@ from watercolor_tutor.nodes.reexplain import reexplain
 from watercolor_tutor.nodes.respond import respond
 from watercolor_tutor.state import TutorState
 
+# reexplain now grounds via RAG; stub it off here so these node tests stay offline
+# (grounding is proven in test_grounding.py).
+pytestmark = pytest.mark.usefixtures("stub_grounding")
+
 
 def _state(step: int = 2, intent: str = "", messages: list | None = None) -> TutorState:
     return TutorState(

@@ -10,6 +10,10 @@ import pytest
 from watercolor_tutor.nodes.teach import teach
 from watercolor_tutor.state import TutorState
 
+# These tests exercise the step prompt + message shape, not RAG — keep grounding
+# stubbed off so they stay offline. Grounding is proven in test_grounding.py.
+pytestmark = pytest.mark.usefixtures("stub_grounding")
+
 
 def test_teach_emits_lesson_and_sets_awaiting(
     initial_state: TutorState, monkeypatch: pytest.MonkeyPatch
