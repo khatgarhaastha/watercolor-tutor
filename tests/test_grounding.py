@@ -11,6 +11,9 @@ from watercolor_tutor.nodes.reexplain import reexplain
 from watercolor_tutor.nodes.teach import teach
 from watercolor_tutor.state import TutorState
 
+# Grounding runs the REAL retriever, so the index must be built first.
+pytestmark = pytest.mark.usefixtures("rag_index")
+
 # Specifics that exist only in the corpus, so finding them in the prompt proves
 # they came from retrieval.
 _CORPUS_SPECIFICS = ("1:3", "15 degrees", "bead", "backrun", "wet edge")

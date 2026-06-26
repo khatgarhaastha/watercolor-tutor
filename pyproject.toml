@@ -15,7 +15,12 @@ dependencies = [
     "anthropic>=0.40",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
-    "model2vec>=0.8",  # tiny local static embeddings for RAG (numpy-only, no torch)
+    # RAG backend (v2 Slice 2.6) — production-shape demo: FAISS vector store +
+    # local transformer embeddings. Heavier than the corpus needs (torch arrives
+    # via sentence-transformers); chosen deliberately to rehearse the scalable
+    # architecture behind the unchanged retrieve() interface.
+    "faiss-cpu>=1.8",
+    "sentence-transformers>=3.0",
     "numpy>=1.26",
 ]
 

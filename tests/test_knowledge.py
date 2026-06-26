@@ -5,11 +5,17 @@ the embedding model once (downloaded on first run, then cached) — that's why t
 live apart from the stubbed flow/node tests.
 """
 
-from watercolor_tutor.retrieval import SHARED_STEP, _chunks, retrieve
+import pytest
+
+from watercolor_tutor.ingest import _load_chunks
+from watercolor_tutor.retrieval import SHARED_STEP, retrieve
+
+# These tests query the REAL FAISS index, so they need it built first.
+pytestmark = pytest.mark.usefixtures("rag_index")
 
 
 def test_chunks_are_tagged_by_step() -> None:
-    steps = {chunk.step for chunk in _chunks()}
+    steps = {chunk.step for chunk in _load_chunks()}
     assert SHARED_STEP in steps  # the 00-diagnostics doc
     assert {1, 2, 3} <= steps  # one per lesson step
 

@@ -1,39 +1,48 @@
-"""Local semantic retrieval (RAG) over the curated corpus in `knowledge/`.
+"""Local semantic retrieval (RAG) over the curated corpus — FAISS-backed.
 
-The pipeline, end to end:
-  1. CHUNK   — load each markdown doc and split it on `## ` headings; tag each
-               chunk with the STEP from its filename (00-* = shared, eligible for
-               every step).
-  2. EMBED   — turn every chunk into a vector with a small LOCAL static-embedding
-               model (model2vec). "Static embeddings" = each token has a
-               precomputed vector and encoding just averages them, so it's fast,
-               deterministic, needs no GPU/torch, and runs offline. The ~30 MB
-               model is downloaded once from the HuggingFace hub, then cached.
-  3. RETRIEVE — embed the query, cosine-rank the current step's candidate chunks,
-               return the top-k. Cosine similarity = how aligned two vectors are
-               (1.0 = same direction/meaning, 0 = unrelated).
+PRODUCTION-SHAPE NOTE (read this first): our corpus is 4 short docs. In-memory
+cosine was entirely sufficient, and this FAISS + transformer-embedding backend is
+NOT required for correctness. We use it deliberately to rehearse the scalable,
+production RAG architecture (index once, query many) behind the SAME `retrieve()`
+interface the nodes already call — so swapping the backend touched zero node code.
 
-`retrieve()` is the swappable seam: only `_model()` knows about model2vec, so a
-different backend (Voyage, a vector DB) could replace it without touching callers.
+Split of responsibilities:
+  - ingest.py          : OFFLINE — read docs, chunk, embed, WRITE the index to disk.
+  - retrieval.py (here): QUERY TIME — LOAD the prebuilt index, embed the query,
+    SEARCH for the top-k. It never re-reads or re-embeds the corpus.
+
+How the search works: chunk vectors are L2-normalized, so FAISS's inner-product
+index (`IndexFlatIP`) ranks by cosine similarity. `IndexFlat` is exact (brute
+force) — right at this scale; a large corpus would use an approximate index
+(IVF/HNSW) that searches without comparing against every vector.
 """
 
-import re
+import json
 from dataclasses import dataclass
 from functools import lru_cache
-from importlib import resources
+from pathlib import Path
+from typing import Any
 
+import faiss
 import numpy as np
-from model2vec import StaticModel
+from sentence_transformers import SentenceTransformer
 
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Tiny static-embedding model (~30 MB, numpy-only inference). Downloaded once.
-EMBEDDING_MODEL = "minishlab/potion-base-8M"
+# Small, standard sentence-transformer (384-dim). Downloaded once, then cached.
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # Chunks from 00-*.md are shared — eligible for retrieval on every step.
 SHARED_STEP = 0
+
+# Where the prebuilt index lives: inside the package for discoverability, and
+# gitignored (it's a derived artifact, rebuilt by `python -m watercolor_tutor.ingest`).
+# A read-only deployment would override INDEX_DIR to an external writable path.
+INDEX_DIR = Path(__file__).resolve().parent / "knowledge" / "_index"
+INDEX_FILE = "index.faiss"
+META_FILE = "chunks.json"
 
 
 @dataclass(frozen=True)
@@ -45,65 +54,58 @@ class Chunk:
 
 
 @lru_cache(maxsize=1)
-def _model() -> StaticModel:
+def _embedder() -> SentenceTransformer:
     """Load (and cache) the embedding model. First call downloads it; then cached."""
     logger.info("loading embedding model %s", EMBEDDING_MODEL)
-    return StaticModel.from_pretrained(EMBEDDING_MODEL)
+    return SentenceTransformer(EMBEDDING_MODEL)
 
 
-def _split_sections(markdown: str) -> list[str]:
-    """Split a doc into chunks on `## ` headings (each heading kept with its body).
+def _embed(texts: list[str]) -> np.ndarray:
+    """Embed texts as L2-normalized float32 vectors (cosine-ready for IndexFlatIP)."""
+    vectors = _embedder().encode(texts, normalize_embeddings=True)
+    return np.asarray(vectors, dtype="float32")
 
-    The text before the first `## ` (the `# Title`) carries no technique content,
-    so it's dropped.
+
+@lru_cache(maxsize=1)
+def _load_index() -> tuple[Any, list[Chunk]]:
+    """Load the prebuilt FAISS index + chunk metadata from disk (cached).
+
+    By design we do NOT build the index lazily here — a missing index raises a
+    clear error, keeping the index-once / query-many split explicit.
     """
-    parts = re.split(r"(?m)^(?=## )", markdown)
-    return [p.strip() for p in parts if p.strip().startswith("## ")]
-
-
-@lru_cache(maxsize=1)
-def _chunks() -> tuple[Chunk, ...]:
-    """Load + chunk every doc in knowledge/, tagging each chunk with its step."""
-    chunks: list[Chunk] = []
-    knowledge_dir = resources.files("watercolor_tutor.knowledge")
-    for entry in sorted(knowledge_dir.iterdir(), key=lambda p: p.name):
-        if not entry.name.endswith(".md"):
-            continue
-        step = int(entry.name[:2])  # "03-flat-wash.md" -> 3 ; "00-*.md" -> SHARED_STEP
-        for section in _split_sections(entry.read_text(encoding="utf-8")):
-            chunks.append(Chunk(text=section, step=step))
-    logger.info("loaded %d knowledge chunks", len(chunks))
-    return tuple(chunks)
-
-
-@lru_cache(maxsize=1)
-def _chunk_matrix() -> np.ndarray:
-    """Embed all chunks once; row i is the vector for _chunks()[i]."""
-    return _model().encode([chunk.text for chunk in _chunks()])
-
-
-def _cosine(query_vec: np.ndarray, matrix: np.ndarray) -> np.ndarray:
-    """Cosine similarity between one query vector and each row of `matrix`."""
-    query_unit = query_vec / (np.linalg.norm(query_vec) + 1e-9)
-    row_units = matrix / (np.linalg.norm(matrix, axis=1, keepdims=True) + 1e-9)
-    return row_units @ query_unit
+    index_path = INDEX_DIR / INDEX_FILE
+    meta_path = INDEX_DIR / META_FILE
+    if not index_path.exists() or not meta_path.exists():
+        raise FileNotFoundError(
+            f"RAG index not found in {INDEX_DIR}. Build it once with:\n"
+            "    python -m watercolor_tutor.ingest"
+        )
+    index = faiss.read_index(str(index_path))
+    metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+    chunks = [Chunk(text=entry["text"], step=entry["step"]) for entry in metadata]
+    return index, chunks
 
 
 def retrieve(step: int, query: str, k: int = 3) -> list[str]:
     """Return the top-k most relevant chunk texts for `query`, scoped to `step`.
 
     The step SCOPES the candidates: only this step's chunks plus the shared (00)
-    chunks are considered, so Step 3 can't surface Step 1's materials notes.
+    chunks count. We search the whole (tiny) index, then filter the ranked results
+    by step. NOTE: at scale you'd push the step filter INTO the search (FAISS
+    `IDSelector`, or a metadata-filtering store) rather than search-all-then-filter.
     """
-    chunks = _chunks()
-    candidate_idx = [i for i, chunk in enumerate(chunks) if chunk.step in (step, SHARED_STEP)]
-    if not candidate_idx:
-        return []
+    index, chunks = _load_index()
+    query_vec = _embed([query])
+    _, ranked_idx = index.search(query_vec, len(chunks))  # rank every chunk (exact)
 
-    query_vec = _model().encode([query])[0]
-    scores = _cosine(query_vec, _chunk_matrix()[candidate_idx])
-    ranked = sorted(zip(candidate_idx, scores, strict=True), key=lambda pair: pair[1], reverse=True)
-    return [chunks[i].text for i, _ in ranked[:k]]
+    results: list[str] = []
+    for idx in ranked_idx[0]:
+        chunk = chunks[int(idx)]
+        if chunk.step in (step, SHARED_STEP):
+            results.append(chunk.text)
+            if len(results) == k:
+                break
+    return results
 
 
 GROUNDING_PREAMBLE = (

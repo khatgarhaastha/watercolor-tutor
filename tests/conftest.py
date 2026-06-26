@@ -4,6 +4,8 @@ Tests must NOT hit the real Anthropic API. As LLM-backed nodes arrive, inject a
 fake client via the `fake_llm` fixture below rather than calling out.
 """
 
+from collections.abc import Iterator
+
 import pytest
 
 from watercolor_tutor.state import TutorState
@@ -24,6 +26,22 @@ def stub_grounding(monkeypatch: pytest.MonkeyPatch) -> None:
     (test_knowledge, test_grounding) deliberately don't use this fixture.
     """
     monkeypatch.setattr("watercolor_tutor.retrieval.grounding_for", lambda *a, **k: "")
+
+
+@pytest.fixture(scope="session")
+def rag_index() -> Iterator[None]:
+    """Build the real FAISS index once so retrieval tests can query it.
+
+    Runs the offline ingestion step into the default (gitignored) index dir.
+    Downloads the embedding model on first run (cached thereafter), then the
+    static embeddings are deterministic. Flow/node tests don't use this — they
+    stub grounding off via `stub_grounding`.
+    """
+    from watercolor_tutor import ingest, retrieval
+
+    ingest.build_index()  # writes index.faiss + chunks.json to the default INDEX_DIR
+    retrieval._load_index.cache_clear()  # ensure a fresh load picks up the build
+    yield
 
 
 @pytest.fixture
