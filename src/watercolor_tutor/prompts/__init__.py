@@ -62,17 +62,58 @@ STEP_PROMPTS: dict[int, str] = {
     ),
 }
 
-# System prompt for the v1 intent classifier. Deliberately short: it's well below
+# System prompt for the intent classifier. Deliberately short: it's well below
 # the model's minimum cacheable prefix (~2048 tokens on Sonnet 4.6), so prompt
 # caching would not engage here anyway — short + cheap is the right call.
 INTENT_SYSTEM_PROMPT = (
-    "You classify a beginner watercolor learner's reply during a step-by-step "
-    "lesson. Choose their intent:\n"
-    "- 'question': they are asking something and are NOT signalling they want to "
-    "move on.\n"
-    "- 'ready': they are signalling they want to continue to the next step (e.g. "
-    "'ready', 'next', 'got it', 'all set') and are NOT asking anything.\n"
-    "- 'both': in the same message they ask a question AND signal they want to "
-    "move on (e.g. 'sounds good, but what brush should I use?').\n"
+    "You classify a beginner watercolor learner's reply during a fixed 3-step "
+    "lesson. Choose exactly one intent:\n"
+    "- 'question': asks something specific, not signalling they want to move on "
+    "(e.g. 'which brush is best?').\n"
+    "- 'ready': signals they want to continue to the next step, no question "
+    "(e.g. 'ready', 'next', 'got it', 'all set').\n"
+    "- 'both': in one message asks a question AND signals they want to move on "
+    "(e.g. 'sounds good, but what brush should I use?').\n"
+    "- 'confused': says they don't understand or asks you to explain the current "
+    "step again or more simply (e.g. 'I'm lost', 'can you explain that differently?').\n"
+    "- 'skip_ahead': wants to jump forward to a later step (e.g. 'can we skip to "
+    "the wash?').\n"
+    "- 'go_back': wants to return to an earlier step (e.g. 'wait, can we revisit "
+    "brushes?').\n"
+    "- 'off_topic': not about the painting lesson at all (e.g. 'what's your "
+    "favorite color?', small talk).\n"
+    "- 'sharing_progress': describes what they painted or how it's going (e.g. "
+    "'I just painted a blue sky!').\n"
     "First give one brief sentence of reasoning, then the intent label."
 )
+
+# Re-teach instruction for the `reexplain` node (the 'confused' intent). This is
+# a re-teach of the CURRENT step, not an answer to a question.
+REEXPLAIN_INSTRUCTION = (
+    "The learner is confused about Step {step}: {title}. Re-explain THIS step a "
+    "different way — simpler, with a concrete example or analogy — without "
+    "repeating your earlier wording. Keep it short and encouraging."
+)
+
+# Framing for the `respond` node, keyed by intent. These replies never change the
+# step: the learner stays where they are and we loop back to wait for them. The
+# 'skip_ahead'/'go_back' entries are the graceful BOUNDARY messages — `respond`
+# is only reached for those intents when the move is blocked at an edge.
+RESPONSE_INSTRUCTIONS: dict[str, str] = {
+    "off_topic": (
+        "Their message is off-topic for the painting lesson. Warmly and briefly "
+        "acknowledge it, then gently steer them back to the current step."
+    ),
+    "sharing_progress": (
+        "They're sharing what they painted or how it's going. Respond with "
+        "specific, warm encouragement, then invite them to continue when ready."
+    ),
+    "skip_ahead": (
+        "They want to skip ahead, but they're already on the FINAL step — there "
+        "is no next step. Reassure them warmly and encourage them to finish this one."
+    ),
+    "go_back": (
+        "They want to go back, but they're already on the FIRST step — there's "
+        "nothing before it. Reassure them warmly and carry on with this step."
+    ),
+}

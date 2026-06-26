@@ -76,32 +76,67 @@ def last_user_message(state: TutorState) -> str | None:
     return None
 
 
+# --- Navigation bounds ------------------------------------------------------
+# The lesson is steps 1..TOTAL_STEPS. These pure helpers are the single place
+# that knows the edges, so the router never sends the learner past them and the
+# move nodes never compute an out-of-range step.
+
+
+def can_advance(step: int) -> bool:
+    """True if there is a step after this one."""
+    return step < TOTAL_STEPS
+
+
+def can_go_back(step: int) -> bool:
+    """True if there is a step before this one."""
+    return step > 1
+
+
+def clamp_step(step: int) -> int:
+    """Force a step number back into the valid 1..TOTAL_STEPS range.
+
+    Defense-in-depth: the router already refuses out-of-bounds moves, but the
+    move nodes clamp too, so an invalid step is impossible by construction.
+    """
+    return max(1, min(step, TOTAL_STEPS))
+
+
 def _advance_or_end(step: int) -> Literal["advance", "end"]:
-    """Advance to the next step, or end if we're on the last one."""
-    return "advance" if step < TOTAL_STEPS else "end"
+    """Advance to the next step, or end the lesson if we're on the last one."""
+    return "advance" if can_advance(step) else "end"
 
 
-def route_after_input(state: TutorState) -> Literal["answer", "advance", "end"]:
-    """Decide where to go after the learner replies (the conditional edge).
+def route_after_input(
+    state: TutorState,
+) -> Literal["answer", "advance", "go_back", "reexplain", "respond", "end"]:
+    """Decide where to go after the learner replies (the first conditional edge).
 
-    Reads the `intent` the classify node wrote to state — this router is now PURE
-    (no LLM, no text heuristics), so every branch is testable offline.
-
-    - "ready"            -> advance to the next step (or "end" on the last step)
-    - "question"/"both"  -> "answer" first; for "both", route_after_answer then
-                            advances once the question has been answered.
+    Pure: reads only state["intent"] and state["step"]. This is also where the
+    navigation guardrails live — a blocked skip/back routes to `respond` for a
+    graceful boundary message instead of running off the ends of the lesson.
 
     Returns a string KEY; `graph.py` maps "end" to LangGraph's END sentinel.
     """
     intent = state["intent"]
-    if intent == "ready":
-        logger.info(
-            "router: ready -> %s (from step=%s)", _advance_or_end(state["step"]), state["step"]
-        )
-        return _advance_or_end(state["step"])
+    step = state["step"]
+    logger.info("routing intent=%s step=%s", intent, step)
 
-    logger.info("router: intent=%s -> answer", intent)
-    return "answer"
+    if intent == "ready":
+        # Finished the step and ready: advance, or finish on the last step.
+        return _advance_or_end(step)
+    if intent == "skip_ahead":
+        # Jump forward — unless already on the last step (then reassure & stay).
+        return "advance" if can_advance(step) else "respond"
+    if intent == "go_back":
+        # Step back — unless already on the first step (then reassure & stay).
+        return "go_back" if can_go_back(step) else "respond"
+    if intent == "confused":
+        return "reexplain"  # re-teach the current step differently
+    if intent in ("question", "both"):
+        return "answer"
+
+    # off_topic, sharing_progress, or any unrecognized label: reply and stay put.
+    return "respond"
 
 
 def route_after_answer(state: TutorState) -> Literal["await_learner", "advance", "end"]:

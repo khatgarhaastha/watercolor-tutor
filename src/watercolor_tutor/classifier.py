@@ -31,10 +31,16 @@ class IntentResult(BaseModel):
     """
 
     reasoning: str = Field(description="One brief sentence explaining the choice.")
-    intent: Literal["question", "ready", "both"] = Field(
-        description="question = asks something; ready = wants to move on; "
-        "both = asks AND wants to move on"
-    )
+    intent: Literal[
+        "question",  # asks something, not ready to move on
+        "ready",  # wants to continue to the next step
+        "both",  # asks a question AND wants to move on
+        "confused",  # doesn't understand; wants the current step re-explained
+        "skip_ahead",  # wants to jump forward a step
+        "go_back",  # wants to return to an earlier step
+        "off_topic",  # not about the lesson
+        "sharing_progress",  # describes what they painted / how it's going
+    ] = Field(description="The single best label for the learner's latest reply.")
 
 
 def classify_intent(text: str) -> str:

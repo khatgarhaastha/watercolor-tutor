@@ -24,6 +24,15 @@ def test_classify_intent_returns_both(monkeypatch: pytest.MonkeyPatch) -> None:
     assert classifier.classify_intent("sounds good, but what color first?") == "both"
 
 
+@pytest.mark.parametrize(
+    "label", ["confused", "skip_ahead", "go_back", "off_topic", "sharing_progress"]
+)
+def test_classify_intent_returns_new_labels(label: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    result = IntentResult.model_validate({"reasoning": "r", "intent": label})
+    monkeypatch.setattr(llm, "parse", lambda *a, **k: result)
+    assert classifier.classify_intent("...") == label
+
+
 def test_classify_intent_falls_back_on_error(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(*a: object, **k: object) -> IntentResult:
         raise RuntimeError("API unavailable")

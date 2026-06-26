@@ -4,18 +4,25 @@ This module is WIRING ONLY. Reading it should explain the whole agent at a
 glance: which nodes exist and how control flows between them. The actual work
 lives in `nodes/`.
 
-Current shape (v1):
+Current shape (v1, full intent set):
 
     START -> welcome -> teach -> await_learner -> classify -[route_after_input]-> ...
 
-    route_after_input (on intent):  ready -> advance | question,both -> answer
-    answer -[route_after_answer]->  both -> advance  | question      -> await_learner
-    advance -> teach (loop)         (ready/both on the last step -> END)
+    route_after_input (on intent):
+        ready       -> advance   (or END on the last step)
+        skip_ahead  -> advance   (or respond, if already on the last step)
+        go_back     -> go_back    (or respond, if already on the first step)
+        confused    -> reexplain
+        question,both -> answer
+        off_topic, sharing_progress -> respond
+    answer  -[route_after_answer]-> both -> advance/END | question -> await_learner
+    advance -> teach     go_back -> teach     reexplain -> await_learner
+    respond -> await_learner
 
-`await_learner` pauses for the learner; `classify` runs the LLM intent classifier
-and writes `intent` to state; the pure routers then act on it. "both" (a question
-AND a ready-signal) routes to `answer`, and route_after_answer advances afterward
-— fixing the v0 case where a mixed reply dropped the question.
+`classify` runs the LLM intent classifier and writes `intent` to state; the pure
+routers act on it. Navigation bounds live in route_after_input: a blocked skip or
+go_back is sent to `respond` for a graceful boundary message rather than running
+off the ends of the 3-step lesson.
 """
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -26,6 +33,9 @@ from .nodes.advance import advance
 from .nodes.answer import answer
 from .nodes.await_learner import await_learner
 from .nodes.classify import classify
+from .nodes.go_back import go_back
+from .nodes.reexplain import reexplain
+from .nodes.respond import respond
 from .nodes.teach import teach
 from .nodes.welcome import welcome
 from .routing import route_after_answer, route_after_input
@@ -45,6 +55,9 @@ def build_graph() -> StateGraph:
     builder.add_node("classify", classify)
     builder.add_node("answer", answer)
     builder.add_node("advance", advance)
+    builder.add_node("go_back", go_back)
+    builder.add_node("reexplain", reexplain)
+    builder.add_node("respond", respond)
 
     builder.add_edge(START, "welcome")
     builder.add_edge("welcome", "teach")
@@ -59,7 +72,14 @@ def build_graph() -> StateGraph:
     builder.add_conditional_edges(
         "classify",
         route_after_input,
-        {"answer": "answer", "advance": "advance", "end": END},
+        {
+            "answer": "answer",
+            "advance": "advance",
+            "go_back": "go_back",
+            "reexplain": "reexplain",
+            "respond": "respond",
+            "end": END,
+        },
     )
 
     # Second conditional edge: after answering, "both" advances; a plain question
@@ -70,7 +90,11 @@ def build_graph() -> StateGraph:
         {"await_learner": "await_learner", "advance": "advance", "end": END},
     )
 
-    builder.add_edge("advance", "teach")  # moved to next step -> teach it
+    # Step-moving nodes re-teach; reply-and-stay nodes loop back to the learner.
+    builder.add_edge("advance", "teach")
+    builder.add_edge("go_back", "teach")
+    builder.add_edge("reexplain", "await_learner")
+    builder.add_edge("respond", "await_learner")
     return builder
 
 
