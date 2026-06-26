@@ -22,8 +22,14 @@ class TutorState(TypedDict):
         awaiting_question: True once a step has been taught and we're waiting on
             the learner to either ask a question or signal they're ready to move
             on. The router (added in a later slice) reads this to decide flow.
+        intent: The learner's classified intent for their latest message
+            ("question" | "ready" | "both"). Written by the `classify` node and
+            read by the pure routers — this is how the LLM's understanding of the
+            reply is carried from the node that decides it to the edges that act
+            on it. Empty string before any classification has run.
     """
 
     messages: Annotated[list, add_messages]
     step: int
     awaiting_question: bool
+    intent: str

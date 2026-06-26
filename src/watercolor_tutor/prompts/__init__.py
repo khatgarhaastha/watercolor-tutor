@@ -61,3 +61,18 @@ STEP_PROMPTS: dict[int, str] = {
         "completing their first watercolor lesson — do not mention any further step."
     ),
 }
+
+# System prompt for the v1 intent classifier. Deliberately short: it's well below
+# the model's minimum cacheable prefix (~2048 tokens on Sonnet 4.6), so prompt
+# caching would not engage here anyway — short + cheap is the right call.
+INTENT_SYSTEM_PROMPT = (
+    "You classify a beginner watercolor learner's reply during a step-by-step "
+    "lesson. Choose their intent:\n"
+    "- 'question': they are asking something and are NOT signalling they want to "
+    "move on.\n"
+    "- 'ready': they are signalling they want to continue to the next step (e.g. "
+    "'ready', 'next', 'got it', 'all set') and are NOT asking anything.\n"
+    "- 'both': in the same message they ask a question AND signal they want to "
+    "move on (e.g. 'sounds good, but what brush should I use?').\n"
+    "First give one brief sentence of reasoning, then the intent label."
+)

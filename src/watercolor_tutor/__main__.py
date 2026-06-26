@@ -46,7 +46,9 @@ def main() -> None:
     config: RunnableConfig = {"configurable": {"thread_id": "cli-session"}}
 
     # Kick off: welcome + teach step 1, then the graph pauses at await_learner.
-    state = graph.invoke({"messages": [], "step": 0, "awaiting_question": False}, config=config)
+    state = graph.invoke(
+        {"messages": [], "step": 0, "awaiting_question": False, "intent": ""}, config=config
+    )
     printed = _print_new_assistant_messages(state["messages"], 0)
 
     # Loop as long as the graph is paused waiting on the learner. An empty

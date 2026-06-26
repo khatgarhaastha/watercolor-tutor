@@ -76,24 +76,44 @@ def last_user_message(state: TutorState) -> str | None:
     return None
 
 
+def _advance_or_end(step: int) -> Literal["advance", "end"]:
+    """Advance to the next step, or end if we're on the last one."""
+    return "advance" if step < TOTAL_STEPS else "end"
+
+
 def route_after_input(state: TutorState) -> Literal["answer", "advance", "end"]:
-    """Decide what happens after the learner replies (this IS the conditional edge).
+    """Decide where to go after the learner replies (the conditional edge).
 
-    - A ready-signal with more steps left -> "advance" (teach the next step)
-    - A ready-signal on the final step     -> "end"     (lesson complete)
-    - Anything else                        -> "answer"  (treat it as a question)
+    Reads the `intent` the classify node wrote to state — this router is now PURE
+    (no LLM, no text heuristics), so every branch is testable offline.
 
-    Returns a string KEY; `graph.py` maps "end" to LangGraph's END sentinel when
-    it wires this up. Keeping the sentinel out of here keeps routing dependency-free.
+    - "ready"            -> advance to the next step (or "end" on the last step)
+    - "question"/"both"  -> "answer" first; for "both", route_after_answer then
+                            advances once the question has been answered.
+
+    Returns a string KEY; `graph.py` maps "end" to LangGraph's END sentinel.
     """
-    learner_said = last_user_message(state) or ""
+    intent = state["intent"]
+    if intent == "ready":
+        logger.info(
+            "router: ready -> %s (from step=%s)", _advance_or_end(state["step"]), state["step"]
+        )
+        return _advance_or_end(state["step"])
 
-    if is_ready_signal(learner_said):
-        if state["step"] < TOTAL_STEPS:
-            logger.info("router: ready -> advance (from step=%s)", state["step"])
-            return "advance"
-        logger.info("router: ready on final step -> end")
-        return "end"
-
-    logger.info("router: treating reply as a question -> answer")
+    logger.info("router: intent=%s -> answer", intent)
     return "answer"
+
+
+def route_after_answer(state: TutorState) -> Literal["await_learner", "advance", "end"]:
+    """Decide where to go after answering a question (the second conditional edge).
+
+    This is what fixes the v0 bug. If the intent was "both" (a question AND a
+    ready-signal), we advance now that the question is answered; otherwise we loop
+    back to wait for the learner's next reply.
+    """
+    if state["intent"] == "both":
+        logger.info("router: both -> %s after answering", _advance_or_end(state["step"]))
+        return _advance_or_end(state["step"])
+
+    logger.info("router: question answered -> await_learner")
+    return "await_learner"

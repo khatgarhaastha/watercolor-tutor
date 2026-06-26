@@ -4,17 +4,18 @@ This module is WIRING ONLY. Reading it should explain the whole agent at a
 glance: which nodes exist and how control flows between them. The actual work
 lives in `nodes/`.
 
-Current shape:
+Current shape (v1):
 
-    START -> welcome -> teach -> await_learner --[route_after_input]--> answer
-                          ^            ^                              |  advance | end
-                          |            |__________ answer ____________|          |
-                          |_______________________ advance _____________________|
-                                                                            END
+    START -> welcome -> teach -> await_learner -> classify -[route_after_input]-> ...
 
-`welcome` greets once; `teach` delivers the current step; `await_learner` pauses
-for the learner; the conditional edge routes their reply to `answer` (a question,
-loop back) , `advance` (ready -> next step), or END (ready on the final step).
+    route_after_input (on intent):  ready -> advance | question,both -> answer
+    answer -[route_after_answer]->  both -> advance  | question      -> await_learner
+    advance -> teach (loop)         (ready/both on the last step -> END)
+
+`await_learner` pauses for the learner; `classify` runs the LLM intent classifier
+and writes `intent` to state; the pure routers then act on it. "both" (a question
+AND a ready-signal) routes to `answer`, and route_after_answer advances afterward
+— fixing the v0 case where a mixed reply dropped the question.
 """
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -24,9 +25,10 @@ from langgraph.graph.state import CompiledStateGraph
 from .nodes.advance import advance
 from .nodes.answer import answer
 from .nodes.await_learner import await_learner
+from .nodes.classify import classify
 from .nodes.teach import teach
 from .nodes.welcome import welcome
-from .routing import route_after_input
+from .routing import route_after_answer, route_after_input
 from .state import TutorState
 
 
@@ -40,25 +42,34 @@ def build_graph() -> StateGraph:
     builder.add_node("welcome", welcome)
     builder.add_node("teach", teach)
     builder.add_node("await_learner", await_learner)
+    builder.add_node("classify", classify)
     builder.add_node("answer", answer)
     builder.add_node("advance", advance)
 
     builder.add_edge(START, "welcome")
     builder.add_edge("welcome", "teach")
     builder.add_edge("teach", "await_learner")
+    # After the learner replies, classify their intent before deciding flow.
+    builder.add_edge("await_learner", "classify")
 
-    # The conditional edge. route_after_input(state) returns a string key; the
-    # path_map below translates each key to a destination node — and maps "end"
-    # to LangGraph's END sentinel. (Keeping END out of routing.py is why the
-    # router stays a plain, dependency-free, easily-tested function.)
+    # First conditional edge: route on the classified intent. The path_map
+    # translates each string key to a node — and "end" to LangGraph's END
+    # sentinel. (Keeping END out of routing.py is why the routers stay plain,
+    # dependency-free, easily-tested functions.)
     builder.add_conditional_edges(
-        "await_learner",
+        "classify",
         route_after_input,
         {"answer": "answer", "advance": "advance", "end": END},
     )
 
-    # The two loop-backs that make this a graph rather than a straight line:
-    builder.add_edge("answer", "await_learner")  # answered a question -> wait again
+    # Second conditional edge: after answering, "both" advances; a plain question
+    # loops back to wait. This is the pair that fixes the v0 "both" bug.
+    builder.add_conditional_edges(
+        "answer",
+        route_after_answer,
+        {"await_learner": "await_learner", "advance": "advance", "end": END},
+    )
+
     builder.add_edge("advance", "teach")  # moved to next step -> teach it
     return builder
 
