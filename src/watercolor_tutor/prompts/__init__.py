@@ -134,3 +134,14 @@ VISION_FEEDBACK_INSTRUCTION = (
     "one thing that's working well and one concrete thing to improve. Avoid "
     "generic praise — ground every comment in what you actually see in the image."
 )
+
+# Preamble for the retrieved diagnostics in a vision critique (Slice 2.5). The
+# "only if you actually SEE it" rule is the heart of Design A-plus: we retrieve
+# the whole step's fault rubric, but the model only surfaces the diagnostics that
+# match what's visible — so the critique stays honest and targeted.
+VISION_GROUNDING_PREAMBLE = (
+    "Studio diagnostics (fault → cause → fix) from the handbook. If — and ONLY if — "
+    "you actually SEE one of these problems in the image, name it and give its "
+    "specific cause and fix from these notes. Do not list faults that aren't "
+    "visible, and don't contradict these notes:"
+)

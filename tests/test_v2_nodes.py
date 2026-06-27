@@ -9,7 +9,7 @@ from watercolor_tutor.state import TutorState
 
 # reexplain now grounds via RAG; stub it off here so these node tests stay offline
 # (grounding is proven in test_grounding.py).
-pytestmark = pytest.mark.usefixtures("stub_grounding")
+pytestmark = pytest.mark.usefixtures("stub_rag")
 
 
 def _state(step: int = 2, intent: str = "", messages: list | None = None) -> TutorState:

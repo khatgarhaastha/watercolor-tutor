@@ -18,14 +18,17 @@ def initial_state() -> TutorState:
 
 
 @pytest.fixture
-def stub_grounding(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Disable RAG grounding so flow/node tests stay fully offline.
+def stub_rag(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable ALL RAG so flow/node tests stay fully offline.
 
-    Real retrieval loads the embedding model (a one-time download); flow tests
-    that only exercise control flow don't need it. Tests that PROVE grounding
-    (test_knowledge, test_grounding) deliberately don't use this fixture.
+    Stubs both the teaching grounding (`grounding_for`, used by teach/reexplain)
+    and the raw retriever (`retrieve`, used by vision_feedback). Real retrieval
+    loads the embedding model (a one-time download); flow tests that only exercise
+    control flow don't need it. Tests that PROVE grounding (test_knowledge,
+    test_grounding) deliberately don't use this fixture — they build the index.
     """
     monkeypatch.setattr("watercolor_tutor.retrieval.grounding_for", lambda *a, **k: "")
+    monkeypatch.setattr("watercolor_tutor.retrieval.retrieve", lambda *a, **k: [])
 
 
 @pytest.fixture(scope="session")

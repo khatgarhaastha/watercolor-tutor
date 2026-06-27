@@ -15,6 +15,10 @@ PNG_1X1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
 )
 
+# vision_feedback now retrieves via RAG; stub it off so these tests stay offline.
+# Grounding of the vision prompt is proven in test_grounding.py.
+pytestmark = pytest.mark.usefixtures("stub_rag")
+
 
 def _state(step: int, image_path: str) -> TutorState:
     return TutorState(
