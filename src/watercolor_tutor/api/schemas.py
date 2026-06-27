@@ -9,13 +9,11 @@ from pydantic import BaseModel, Field
 
 
 class CreateSessionRequest(BaseModel):
-    """Body for POST /sessions. Everything is optional — an empty POST is fine."""
+    """Body for POST /sessions. The name maps to a session (resume-or-create)."""
 
-    # An optional human-friendly label; the real thread_id is this plus a random
-    # suffix, so every POST /sessions yields a brand-new session (never collides).
-    session_id: str | None = Field(
-        default=None, description="Optional label prefixed to the generated session id."
-    )
+    # The learner's display name. Slugified into the thread_id, so the SAME name
+    # returns the SAME session (resume); a new name starts fresh. Empty -> "Learner".
+    name: str | None = Field(default=None, description="The learner's display name.")
 
 
 class MessageRequest(BaseModel):
@@ -34,11 +32,23 @@ class Message(BaseModel):
 class SessionResponse(BaseModel):
     """The standard reply: where the lesson stands plus the relevant messages.
 
-    For a turn (start / message / feedback) `messages` is only what the tutor just
-    said; for GET /sessions/{id} it's the full history (so a UI can rehydrate).
+    For a turn (POST messages / feedback) `messages` is only what the tutor just
+    said; for POST /sessions and GET /sessions/{id} it's the full history (so a UI
+    can render the whole conversation).
     """
 
     thread_id: str = Field(..., description="The session id; pass it back on every call.")
-    step: int = Field(..., description="Current lesson step (1..N; 0 before it starts).")
+    name: str = Field("", description="The learner's display name.")
+    step: int = Field(..., description="Current lesson step (1..total_steps; 0 before start).")
+    total_steps: int = Field(..., description="How many steps the lesson has (for 'Step X of N').")
     status: str = Field(..., description="'awaiting' (ready for input) or 'complete'.")
     messages: list[Message]
+
+
+class SessionSummary(BaseModel):
+    """One row in the session picker (GET /sessions)."""
+
+    thread_id: str
+    name: str = Field("", description="Display name, falling back to the thread_id.")
+    step: int
+    status: str

@@ -1,0 +1,154 @@
+/* Clean, functional styling — readable chat, obvious upload, simple session screen.
+   Not a design project: a small neutral palette, comfortable spacing, system fonts. */
+
+:root {
+  --bg: #f4f1ea;          /* warm paper */
+  --card: #ffffff;
+  --ink: #2b2b2b;
+  --muted: #7a756c;
+  --accent: #3d7a8a;      /* watercolor teal */
+  --accent-soft: #e3eef1;
+  --tutor: #ffffff;
+  --learner: #d8ebe6;
+  --border: #e3ded3;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.view { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* --- Start view --------------------------------------------------------- */
+
+#start-view { align-items: center; justify-content: center; padding: 1.5rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+}
+
+.card h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+.subtitle { margin: 0 0 1.5rem; color: var(--muted); }
+
+#start-form { display: flex; flex-direction: column; gap: 0.5rem; }
+label { font-weight: 600; font-size: 0.9rem; }
+
+input[type="text"] {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 1rem;
+  background: #fff;
+}
+input[type="text"]:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.7rem 1rem;
+}
+button:hover { filter: brightness(1.05); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#sessions-section { margin-top: 1.75rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
+#sessions-section h2 { font-size: 1rem; color: var(--muted); margin: 0 0 0.75rem; }
+#sessions-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.session-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fcfbf8;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.session-row:hover { border-color: var(--accent); background: var(--accent-soft); }
+.session-row .meta { color: var(--muted); font-size: 0.82rem; }
+
+/* --- Chat view ---------------------------------------------------------- */
+
+#chat-view { max-width: 760px; margin: 0 auto; width: 100%; }
+
+.chat-header {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+}
+#back-button {
+  background: transparent; color: var(--accent); font-size: 1.5rem;
+  padding: 0 0.4rem; line-height: 1;
+}
+.chat-header .who { display: flex; flex-direction: column; }
+#learner-name { font-weight: 700; }
+.progress { color: var(--muted); font-size: 0.82rem; }
+
+.messages {
+  flex: 1; overflow-y: auto;
+  padding: 1.25rem 1rem;
+  display: flex; flex-direction: column; gap: 0.85rem;
+}
+
+.bubble {
+  max-width: 78%;
+  padding: 0.7rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  white-space: normal;
+  word-wrap: break-word;
+}
+.bubble.tutor { align-self: flex-start; background: var(--tutor); border-top-left-radius: 4px; }
+.bubble.learner { align-self: flex-end; background: var(--learner); border-top-right-radius: 4px; }
+.bubble.typing { color: var(--muted); font-style: italic; }
+
+/* Tighten markdown spacing inside tutor bubbles. */
+.bubble :first-child { margin-top: 0; }
+.bubble :last-child { margin-bottom: 0; }
+.bubble h1, .bubble h2, .bubble h3 { font-size: 1.05rem; margin: 0.6rem 0 0.3rem; }
+.bubble ul, .bubble ol { margin: 0.4rem 0; padding-left: 1.2rem; }
+.bubble code { background: #f0ece2; padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.9em; }
+.bubble img.painting { max-width: 220px; border-radius: 10px; display: block; }
+
+.composer {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  position: sticky; bottom: 0;
+}
+#upload-button {
+  cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.6rem 0.7rem; font-weight: 600; font-size: 0.85rem;
+  background: #fcfbf8;
+}
+#upload-button:hover { border-color: var(--accent); background: var(--accent-soft); }
+.composer input[type="text"] { flex: 1; }
+
+/* Drag-and-drop affordance over the whole chat. */
+#chat-view.dragging .messages { outline: 3px dashed var(--accent); outline-offset: -10px; }
+
+.banner {
+  text-align: center; color: var(--muted); font-size: 0.85rem;
+  padding: 0.5rem; margin: 0.25rem 1rem;
+}
+.banner.error { color: #b3402e; }

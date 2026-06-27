@@ -12,7 +12,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from watercolor_tutor.api.server import create_app
+from watercolor_tutor.api.server import create_app, slugify
 from watercolor_tutor.config import Settings
 
 # A 1x1 PNG — the smallest valid image, enough for images.load_image to accept it.
@@ -60,15 +60,53 @@ def test_health(client: TestClient) -> None:
 
 
 def test_create_session_starts_the_lesson(client: TestClient) -> None:
-    body = client.post("/sessions").json()
+    body = client.post("/sessions", json={"name": "Aastha K"}).json()
 
-    assert body["thread_id"]
+    assert body["thread_id"] == "aastha-k"  # name slugified into the thread_id
+    assert body["name"] == "Aastha K"  # original display name preserved
     assert body["step"] == 1  # welcome -> teach lands on step 1
+    assert body["total_steps"] == 3  # surfaced so the UI needn't hardcode it
     assert body["status"] == "awaiting"  # paused for the learner
     # Opening = the welcome message + the (stubbed) Step 1 lesson, both assistant.
     assert len(body["messages"]) == 2
     assert all(m["role"] == "assistant" for m in body["messages"])
     assert any("LESSON TEXT" in m["content"] for m in body["messages"])
+
+
+# --- slugify + get-or-create-by-name -----------------------------------------
+
+
+def test_slugify() -> None:
+    assert slugify("Aastha K") == "aastha-k"
+    assert slugify("  Bob  ") == "bob"
+    assert slugify("A!!!B") == "a-b"
+    assert slugify("") == "learner"  # fallback when nothing usable remains
+
+
+def test_post_sessions_resumes_an_existing_name(client: TestClient) -> None:
+    client.post("/sessions", json={"name": "Sam"})
+    client.post("/sessions/sam/messages", json={"text": "ready"})  # advance to step 2
+
+    # Posting the SAME name again resumes (does NOT restart at step 1).
+    body = client.post("/sessions", json={"name": "Sam"}).json()
+
+    assert body["thread_id"] == "sam"
+    assert body["step"] == 2
+    # Full history comes back, including the learner's own earlier turn.
+    assert any(m["role"] == "user" and m["content"] == "ready" for m in body["messages"])
+
+
+def test_list_sessions(client: TestClient) -> None:
+    client.post("/sessions", json={"name": "Aastha"})
+    client.post("/sessions", json={"name": "Sam"})
+    client.post("/sessions/sam/messages", json={"text": "ready"})  # Sam -> step 2
+
+    sessions = client.get("/sessions").json()
+
+    by_id = {s["thread_id"]: s for s in sessions}
+    assert {"aastha", "sam"} <= set(by_id)
+    assert by_id["aastha"]["name"] == "Aastha" and by_id["aastha"]["step"] == 1
+    assert by_id["sam"]["step"] == 2
 
 
 # --- the core resume-per-request cycle ---------------------------------------

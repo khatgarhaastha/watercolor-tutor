@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Watercolor Tutor</title>
+    <!-- Vendored locally (not a CDN) so the demo works offline. marked renders the
+         tutor's markdown; DOMPurify sanitizes the resulting HTML before it's shown. -->
+    <script src="/vendor/marked.min.js"></script>
+    <script src="/vendor/purify.min.js"></script>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <!-- START VIEW: pick a returning learner or enter a new name. -->
+    <main id="start-view" class="view">
+      <div class="card">
+        <h1>🎨 Watercolor Tutor</h1>
+        <p class="subtitle">Learn to paint your first watercolor, one step at a time.</p>
+
+        <form id="start-form">
+          <label for="name-input">Your name</label>
+          <input id="name-input" type="text" placeholder="e.g. Aastha" autocomplete="off" />
+          <button type="submit">Start painting</button>
+        </form>
+
+        <section id="sessions-section" hidden>
+          <h2>Continue a lesson</h2>
+          <ul id="sessions-list"></ul>
+        </section>
+      </div>
+    </main>
+
+    <!-- CHAT VIEW: the conversation. -->
+    <main id="chat-view" class="view" hidden>
+      <header class="chat-header">
+        <button id="back-button" title="Switch learner">‹</button>
+        <div class="who">
+          <span id="learner-name"></span>
+          <span id="progress" class="progress"></span>
+        </div>
+      </header>
+
+      <div id="messages" class="messages"></div>
+
+      <form id="chat-form" class="composer">
+        <label id="upload-button" for="file-input" title="Share a photo of your painting">
+          📷 Share your painting
+        </label>
+        <input id="file-input" type="file" accept="image/*" hidden />
+        <input id="text-input" type="text" placeholder="Type a message…" autocomplete="off" />
+        <button id="send-button" type="submit">Send</button>
+      </form>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

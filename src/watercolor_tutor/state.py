@@ -5,7 +5,7 @@ In LangGraph, every node receives the State and returns a *partial* update. The
 into the running state instead of overwriting it.
 """
 
-from typing import Annotated
+from typing import Annotated, NotRequired
 
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
@@ -32,6 +32,10 @@ class TutorState(TypedDict):
             vision_feedback node). Empty string when no image is pending. Note we
             keep only the PATH here, never the base64 bytes — those go straight
             into a one-off vision call and never into the conversation history.
+        name: The learner's display name, set once at session start by the web UI
+            (e.g. "Aastha K") so it can be shown prettily in the session picker.
+            NotRequired because the terminal app never collects one — read it with
+            `state.get("name", "")`.
     """
 
     messages: Annotated[list, add_messages]
@@ -39,3 +43,4 @@ class TutorState(TypedDict):
     awaiting_question: bool
     intent: str
     image_path: str
+    name: NotRequired[str]

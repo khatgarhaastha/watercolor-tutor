@@ -19,9 +19,20 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
 
-def initial_state() -> dict:
-    """A fresh, empty tutor state for a brand-new session."""
-    return {"messages": [], "step": 0, "awaiting_question": False, "intent": "", "image_path": ""}
+def initial_state(name: str = "") -> dict:
+    """A fresh, empty tutor state for a brand-new session.
+
+    `name` is the learner's display name (web UI only); it persists in the
+    checkpoint so the session picker can show it. The CLI leaves it empty.
+    """
+    return {
+        "messages": [],
+        "step": 0,
+        "awaiting_question": False,
+        "intent": "",
+        "image_path": "",
+        "name": name,
+    }
 
 
 def message_role(message: Any) -> str:
@@ -85,12 +96,14 @@ def session_status(graph: CompiledStateGraph, config: RunnableConfig) -> str:
     return "awaiting" if snapshot.next else "complete"
 
 
-def start_lesson(graph: CompiledStateGraph, config: RunnableConfig) -> tuple[int, str, list[str]]:
+def start_lesson(
+    graph: CompiledStateGraph, config: RunnableConfig, name: str = ""
+) -> tuple[int, str, list[str]]:
     """Begin a brand-new lesson on this thread (welcome + first teach), then pause.
 
     Returns (current_step, status, new_assistant_messages).
     """
-    state = graph.invoke(initial_state(), config=config)
+    state = graph.invoke(initial_state(name), config=config)
     return state["step"], session_status(graph, config), assistant_texts(state["messages"], 0)
 
 
