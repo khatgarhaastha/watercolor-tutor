@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # User/runtime data, not source — gitignored. Delete the file for a full reset.
     db_path: str = Field("watercolor_tutor.sqlite", alias="WATERCOLOR_DB_PATH")
 
+    # Live web search via an external MCP server (v2 Slice 3b-1). Set False to turn
+    # the tool off entirely. The command launches the (swappable) search server.
+    web_search_enabled: bool = Field(True, alias="WATERCOLOR_WEB_SEARCH")
+    mcp_search_command: str = Field("duckduckgo-mcp-server", alias="WATERCOLOR_MCP_SEARCH_COMMAND")
+
 
 @lru_cache
 def get_settings() -> Settings:

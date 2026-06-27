@@ -174,6 +174,30 @@ def test_full_intent_set_with_navigation_bounds(
     assert not graph.get_state(config).next
 
 
+def test_needs_web_info_routes_to_web_search(
+    initial_state: TutorState, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 'needs_web_info' reply routes to web_search, folds live results, stays on-step.
+
+    The MCP seam is stubbed — the real search server is never launched in tests.
+    """
+    monkeypatch.setattr("watercolor_tutor.llm.generate", lambda *_: "LIVE ANSWER")
+    monkeypatch.setattr("watercolor_tutor.classifier.classify_intent", lambda _t: "needs_web_info")
+    monkeypatch.setattr(
+        "watercolor_tutor.mcp_search.web_search", lambda *a, **k: "1. A Set\n   URL: http://x"
+    )
+
+    graph = compile_graph()
+    config: RunnableConfig = {"configurable": {"thread_id": "web"}}
+    graph.invoke(initial_state, config=config)  # teach step 1, pause
+
+    state = graph.invoke(Command(resume="what set should I buy?"), config=config)
+    contents = [_content(m) for m in state["messages"]]
+    assert any("LIVE ANSWER" in c for c in contents)  # web_search synthesis appended
+    assert state["step"] == 1  # stayed on the current step
+    assert graph.get_state(config).next  # paused again
+
+
 def test_vision_feedback_flow(
     initial_state: TutorState, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

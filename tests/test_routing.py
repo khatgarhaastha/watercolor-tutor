@@ -120,6 +120,10 @@ def test_route_confused_goes_to_reexplain() -> None:
     assert route_after_input(_state(intent="confused", step=2)) == "reexplain"
 
 
+def test_route_needs_web_info_goes_to_web_search() -> None:
+    assert route_after_input(_state(intent="needs_web_info", step=2)) == "web_search"
+
+
 def test_route_off_topic_and_progress_go_to_respond() -> None:
     assert route_after_input(_state(intent="off_topic", step=2)) == "respond"
     assert route_after_input(_state(intent="sharing_progress", step=2)) == "respond"

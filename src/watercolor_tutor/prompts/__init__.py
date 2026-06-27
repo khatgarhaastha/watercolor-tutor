@@ -84,6 +84,11 @@ INTENT_SYSTEM_PROMPT = (
     "favorite color?', small talk).\n"
     "- 'sharing_progress': describes what they painted or how it's going (e.g. "
     "'I just painted a blue sky!').\n"
+    "- 'needs_web_info': wants CURRENT or EXTERNAL info the lesson can't cover — "
+    "specific products/paint sets/brushes/paper to BUY, prices, where to buy, or "
+    "recent online tutorials (e.g. 'what's a good cheap beginner set to buy?', "
+    "'how much is cold-press paper?'). NOT for technique how-to questions (those "
+    "are 'question').\n"
     "First give one brief sentence of reasoning, then the intent label."
 )
 
@@ -144,4 +149,21 @@ VISION_GROUNDING_PREAMBLE = (
     "you actually SEE one of these problems in the image, name it and give its "
     "specific cause and fix from these notes. Do not list faults that aren't "
     "visible, and don't contradict these notes:"
+)
+
+# Instructions for the web_search node (v2 Slice 3b-1). The node assembles the
+# learner's question + live search results with f-strings (not .format), so result
+# text containing braces is harmless.
+WEB_SEARCH_PREAMBLE = (
+    "The learner asked for live/external info, and here are current web search "
+    "results. Answer their question for an absolute beginner using these results: "
+    "be practical and concise, recommend cheap/beginner-friendly options where "
+    "relevant, and cite the source links you draw from. If the results don't "
+    "actually answer it, say so honestly."
+)
+WEB_SEARCH_UNAVAILABLE = (
+    "Live web search is currently unavailable. Tell the learner you couldn't fetch "
+    "live results right now, then give the best general guidance you can from your "
+    "own knowledge, and suggest they verify current specifics (prices, products) "
+    "themselves."
 )

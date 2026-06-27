@@ -25,6 +25,10 @@ dependencies = [
     # Durable LangGraph checkpointing (v2 Slice 3a) — SQLite-backed session state
     # so a returning learner resumes across app restarts.
     "langgraph-checkpoint-sqlite>=3.1",
+    # MCP client (v2 Slice 3b-1) — the agent CONSUMES an external web-search MCP
+    # server. duckduckgo-mcp-server is the no-key default; swappable via config.
+    "mcp>=1.2",
+    "duckduckgo-mcp-server>=0.4",
 ]
 
 [project.optional-dependencies]

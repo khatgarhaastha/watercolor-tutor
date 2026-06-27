@@ -10,14 +10,15 @@ Current shape (v2, full intent set + vision feedback):
 
     route_after_reply:  image attached -> vision_feedback ;  else -> classify
     classify -[route_after_input]-> (on intent):
-        ready       -> advance   (or END on the last step)
-        skip_ahead  -> advance   (or respond, if already on the last step)
-        go_back     -> go_back    (or respond, if already on the first step)
-        confused    -> reexplain
-        question,both -> answer
+        ready          -> advance   (or END on the last step)
+        skip_ahead     -> advance   (or respond, if already on the last step)
+        go_back        -> go_back    (or respond, if already on the first step)
+        confused       -> reexplain
+        needs_web_info -> web_search   (live info via the MCP client)
+        question,both  -> answer
         off_topic, sharing_progress -> respond
     answer  -[route_after_answer]-> both -> advance/END | question -> await_learner
-    advance -> teach     go_back -> teach     reexplain/respond/vision_feedback -> await_learner
+    advance/go_back -> teach    reexplain/respond/vision_feedback/web_search -> await_learner
 
 `vision_feedback` looks at a shared image in the context of the current step. The
 image's presence (set by await_learner from a /feedback command) is the routing
@@ -38,6 +39,7 @@ from .nodes.reexplain import reexplain
 from .nodes.respond import respond
 from .nodes.teach import teach
 from .nodes.vision_feedback import vision_feedback
+from .nodes.web_search import web_search
 from .nodes.welcome import welcome
 from .routing import route_after_answer, route_after_input, route_after_reply
 from .state import TutorState
@@ -60,6 +62,7 @@ def build_graph() -> StateGraph:
     builder.add_node("reexplain", reexplain)
     builder.add_node("respond", respond)
     builder.add_node("vision_feedback", vision_feedback)
+    builder.add_node("web_search", web_search)
 
     builder.add_edge(START, "welcome")
     builder.add_edge("welcome", "teach")
@@ -85,6 +88,7 @@ def build_graph() -> StateGraph:
             "go_back": "go_back",
             "reexplain": "reexplain",
             "respond": "respond",
+            "web_search": "web_search",
             "end": END,
         },
     )
@@ -103,6 +107,7 @@ def build_graph() -> StateGraph:
     builder.add_edge("reexplain", "await_learner")
     builder.add_edge("respond", "await_learner")
     builder.add_edge("vision_feedback", "await_learner")
+    builder.add_edge("web_search", "await_learner")
     return builder
 
 

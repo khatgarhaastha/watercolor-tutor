@@ -25,7 +25,8 @@ def test_classify_intent_returns_both(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.parametrize(
-    "label", ["confused", "skip_ahead", "go_back", "off_topic", "sharing_progress"]
+    "label",
+    ["confused", "skip_ahead", "go_back", "off_topic", "sharing_progress", "needs_web_info"],
 )
 def test_classify_intent_returns_new_labels(label: str, monkeypatch: pytest.MonkeyPatch) -> None:
     result = IntentResult.model_validate({"reasoning": "r", "intent": label})

@@ -40,6 +40,7 @@ class IntentResult(BaseModel):
         "go_back",  # wants to return to an earlier step
         "off_topic",  # not about the lesson
         "sharing_progress",  # describes what they painted / how it's going
+        "needs_web_info",  # wants current/external info (products to buy, prices, links)
     ] = Field(description="The single best label for the learner's latest reply.")
 
 
