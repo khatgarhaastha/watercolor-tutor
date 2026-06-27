@@ -14,14 +14,12 @@ The pause/resume rhythm within a run:
 import argparse
 import uuid
 from pathlib import Path
-from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.types import Command
 
-from . import images
+from . import conversation, images
 from .config import get_settings
 from .graph import compile_graph
 from .logging_config import configure_logging, get_logger
@@ -32,37 +30,10 @@ from .observability import setup_tracing
 _FEEDBACK_PREFIXES = ("/feedback", "feedback ")
 
 
-def _initial_state() -> dict:
-    """A fresh, empty tutor state for a brand-new session."""
-    return {"messages": [], "step": 0, "awaiting_question": False, "intent": "", "image_path": ""}
-
-
-def _message_role(message: Any) -> str:
-    """Role across both shapes (dict seed vs LangChain message object)."""
-    return getattr(message, "type", None) or message.get("role")
-
-
-def _message_text(message: Any) -> str:
-    return getattr(message, "content", None) or message["content"]
-
-
-def _print_new_assistant_messages(messages: list, already_printed: int) -> int:
-    """Print tutor (assistant) messages we haven't shown yet; return the new total.
-
-    We skip the learner's own messages — they already typed those.
-    """
-    for message in messages[already_printed:]:
-        if _message_role(message) in ("ai", "assistant"):
-            print(f"\n{_message_text(message)}")
-    return len(messages)
-
-
-def _last_assistant_text(messages: list) -> str | None:
-    """The most recent tutor message — used to re-orient a returning learner."""
-    for message in reversed(messages):
-        if _message_role(message) in ("ai", "assistant"):
-            return _message_text(message)
-    return None
+def _print(texts: list[str]) -> None:
+    """Show the tutor's new messages (returned by conversation.* helpers)."""
+    for text in texts:
+        print(f"\n{text}")
 
 
 def _parse_image_message(line: str) -> tuple[str, str] | None:
@@ -84,7 +55,7 @@ def _parse_image_message(line: str) -> tuple[str, str] | None:
     return None
 
 
-def _converse(graph: CompiledStateGraph, config: RunnableConfig, printed: int) -> None:
+def _converse(graph: CompiledStateGraph, config: RunnableConfig) -> None:
     """Drive the input loop while the graph is paused awaiting the learner."""
     while graph.get_state(config).next:
         try:
@@ -114,8 +85,8 @@ def _converse(graph: CompiledStateGraph, config: RunnableConfig, printed: int) -
             resume = reply
 
         # Resume the paused graph, feeding the reply into await_learner's interrupt().
-        state = graph.invoke(Command(resume=resume), config=config)
-        printed = _print_new_assistant_messages(state["messages"], printed)
+        _, _, new_messages = conversation.resume_turn(graph, config, resume)
+        _print(new_messages)
 
     print("\n🎉 That's a wrap on your first watercolor lesson — you did it! Happy painting!")
 
@@ -170,20 +141,19 @@ def main() -> None:
             # Returning learner, mid-lesson: resume from the saved snapshot and
             # re-show the last tutor message so they have context.
             print("\nWelcome back — resuming your lesson where you left off. 🎨")
-            last = _last_assistant_text(snapshot.values["messages"])
+            last = conversation.last_assistant_text(snapshot.values["messages"])
             if last:
                 print(f"\n{last}")
-            printed = len(snapshot.values["messages"])
         else:
             # New (or already-finished) session: start the lesson fresh.
-            state = graph.invoke(_initial_state(), config=config)
-            printed = _print_new_assistant_messages(state["messages"], 0)
+            _, _, new_messages = conversation.start_lesson(graph, config)
+            _print(new_messages)
             print(
                 "\n(Tips: share your painting with  /feedback <path>  ·  "
                 "or ask to see a reference, e.g. 'can I see an example of a wash?')"
             )
 
-        _converse(graph, config, printed)
+        _converse(graph, config)
 
 
 if __name__ == "__main__":

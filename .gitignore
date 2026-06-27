@@ -29,6 +29,9 @@ src/watercolor_tutor/knowledge/_index/
 *.sqlite-wal
 *.sqlite-shm
 
+# Uploaded painting photos (web API) — user/runtime data, not source
+uploads/
+
 # OS / editor
 .DS_Store
 .idea/

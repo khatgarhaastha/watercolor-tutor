@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # User/runtime data, not source — gitignored. Delete the file for a full reset.
     db_path: str = Field("watercolor_tutor.sqlite", alias="WATERCOLOR_DB_PATH")
 
+    # Where the web API saves uploaded painting photos before sending them to the
+    # vision model. Runtime data, not source — gitignored. Kept on disk (not a
+    # tempdir) so an uploaded image is easy to inspect while debugging a demo.
+    uploads_dir: str = Field("uploads", alias="WATERCOLOR_UPLOADS_DIR")
+
     # Live web search via an external MCP server (v2 Slice 3b-1). Set False to turn
     # the tool off entirely. The command launches the (swappable) search server.
     web_search_enabled: bool = Field(True, alias="WATERCOLOR_WEB_SEARCH")

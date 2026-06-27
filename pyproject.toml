@@ -35,6 +35,11 @@ dependencies = [
     # Observability — LangSmith tracing (we import traceable + wrap_anthropic
     # directly; already present transitively via langchain-core). Optional at runtime.
     "langsmith>=0.3",
+    # Web API (UI slice 1) — FastAPI HTTP layer wrapping the graph; uvicorn serves it
+    # locally; python-multipart handles painting-photo uploads (multipart/form-data).
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +48,8 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
     "mypy>=1.11",
+    # Starlette's TestClient transport — lets API tests hit endpoints in-process.
+    "httpx>=0.27",
 ]
 
 [project.scripts]
