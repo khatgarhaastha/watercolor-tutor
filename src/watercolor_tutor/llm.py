@@ -10,10 +10,12 @@ from typing import TypeVar, cast
 
 from anthropic import Anthropic
 from anthropic.types import MessageParam
+from langsmith.wrappers import wrap_anthropic
 from pydantic import BaseModel
 
 from .config import get_settings
 from .logging_config import get_logger
+from .observability import tracing_enabled
 
 logger = get_logger(__name__)
 
@@ -31,10 +33,16 @@ T = TypeVar("T", bound=BaseModel)
 
 @lru_cache
 def get_client() -> Anthropic:
-    """Return a cached Anthropic client built from configured settings."""
+    """Return a cached Anthropic client built from configured settings.
+
+    When LangSmith tracing is on, the client is wrapped so every call is traced
+    with token usage + latency. When it's off, we return the plain client — no
+    wrapping, no overhead, no network.
+    """
     settings = get_settings()
     logger.debug("constructing Anthropic client model=%s", settings.model)
-    return Anthropic(api_key=settings.anthropic_api_key)
+    client = Anthropic(api_key=settings.anthropic_api_key)
+    return wrap_anthropic(client) if tracing_enabled() else client
 
 
 def generate(system: str, messages: list[dict[str, str]]) -> str:

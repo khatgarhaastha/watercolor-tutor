@@ -20,6 +20,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from langsmith import traceable
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -64,6 +65,7 @@ async def _call_tool_async(command: str, tool_name: str, arguments: dict) -> str
             )
 
 
+@traceable  # shows up as a web-search tool run in LangSmith (no-op when tracing off)
 def web_search(query: str, max_results: int = 5) -> str:
     """Live web search via the text MCP server. "" if disabled or on any failure."""
     settings = get_settings()
@@ -81,6 +83,7 @@ def web_search(query: str, max_results: int = 5) -> str:
         return ""
 
 
+@traceable  # shows up as an image-search tool run in LangSmith (no-op when tracing off)
 def image_search(query: str, max_results: int = 5) -> str:
     """Reference search via the image MCP server, resilient to image rate-limits.
 

@@ -25,6 +25,7 @@ from typing import Any
 
 import faiss
 import numpy as np
+from langsmith import traceable
 from sentence_transformers import SentenceTransformer
 
 from .logging_config import get_logger
@@ -86,6 +87,7 @@ def _load_index() -> tuple[Any, list[Chunk]]:
     return index, chunks
 
 
+@traceable  # shows up as a RAG-retrieval run in LangSmith (no-op when tracing off)
 def retrieve(step: int, query: str, k: int = 3) -> list[str]:
     """Return the top-k most relevant chunk texts for `query`, scoped to `step`.
 

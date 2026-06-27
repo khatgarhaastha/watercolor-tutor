@@ -32,6 +32,9 @@ dependencies = [
     # Image-search MCP server (v2 Slice 3b-2) — no-key reference images; makes the
     # agent a MULTI-server MCP client. Swappable via config.
     "ddg-mcp>=0.1",
+    # Observability — LangSmith tracing (we import traceable + wrap_anthropic
+    # directly; already present transitively via langchain-core). Optional at runtime.
+    "langsmith>=0.3",
 ]
 
 [project.optional-dependencies]

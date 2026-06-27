@@ -24,6 +24,7 @@ from . import images
 from .config import get_settings
 from .graph import compile_graph
 from .logging_config import configure_logging, get_logger
+from .observability import setup_tracing
 
 FEEDBACK_COMMAND = "/feedback"
 
@@ -125,15 +126,20 @@ def main() -> None:
     configure_logging(settings.log_level)
     logger = get_logger(__name__)
 
+    # Enable LangSmith tracing if a key is configured (no-op otherwise). Must run
+    # before the first LLM call so the Anthropic client gets wrapped.
+    tracing = setup_tracing()
+
     # thread_id IS the session identity. It's supplied externally (here, the
     # --session flag; a UI could supply it from a name-selection screen instead).
     # --fresh appends a unique suffix so you always get a clean new session.
     thread_id = f"{args.session}-{uuid.uuid4().hex[:8]}" if args.fresh else args.session
     logger.info(
-        "starting watercolor-tutor model=%s session=%s db=%s",
+        "starting watercolor-tutor model=%s session=%s db=%s tracing=%s",
         settings.model,
         thread_id,
         settings.db_path,
+        tracing,
     )
 
     # SqliteSaver writes each state snapshot to a file on disk, so the session
