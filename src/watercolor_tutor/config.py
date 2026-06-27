@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # Logging verbosity (DEBUG/INFO/WARNING/ERROR).
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 
+    # Where durable session state (the LangGraph SQLite checkpointer) is stored.
+    # User/runtime data, not source — gitignored. Delete the file for a full reset.
+    db_path: str = Field("watercolor_tutor.sqlite", alias="WATERCOLOR_DB_PATH")
+
 
 @lru_cache
 def get_settings() -> Settings:

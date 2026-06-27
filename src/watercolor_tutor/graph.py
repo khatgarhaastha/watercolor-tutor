@@ -24,6 +24,7 @@ image's presence (set by await_learner from a /feedback command) is the routing
 signal — no classifier intent needed, so the v1 machinery is untouched.
 """
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -105,12 +106,15 @@ def build_graph() -> StateGraph:
     return builder
 
 
-def compile_graph() -> CompiledStateGraph:
+def compile_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStateGraph:
     """Build and compile the graph into a runnable.
 
-    We compile with a CHECKPOINTER, which is what lets the graph pause at the
-    `interrupt()` in await_learner and resume on the next invoke(). InMemorySaver
-    holds that state in memory for the life of the process — fine for one CLI
-    session (a persistent checkpointer would survive restarts, a later concern).
+    The CHECKPOINTER is what lets the graph pause at the `interrupt()` in
+    await_learner and resume on the next invoke(). It's dependency-injected so the
+    persistence backend is swappable:
+      - default `InMemorySaver` — ephemeral, per-process; keeps tests offline.
+      - the CLI passes a `SqliteSaver` — durable, so a session survives restarts.
     """
-    return build_graph().compile(checkpointer=InMemorySaver())
+    if checkpointer is None:
+        checkpointer = InMemorySaver()
+    return build_graph().compile(checkpointer=checkpointer)

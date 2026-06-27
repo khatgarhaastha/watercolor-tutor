@@ -24,6 +24,11 @@ htmlcov/
 # Built RAG index — derived artifact; rebuild with `python -m watercolor_tutor.ingest`
 src/watercolor_tutor/knowledge/_index/
 
+# Durable session store (learner conversation state) — user/runtime data, not source
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
 # OS / editor
 .DS_Store
 .idea/

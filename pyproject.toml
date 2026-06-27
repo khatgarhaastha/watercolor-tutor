@@ -22,6 +22,9 @@ dependencies = [
     "faiss-cpu>=1.8",
     "sentence-transformers>=3.0",
     "numpy>=1.26",
+    # Durable LangGraph checkpointing (v2 Slice 3a) — SQLite-backed session state
+    # so a returning learner resumes across app restarts.
+    "langgraph-checkpoint-sqlite>=3.1",
 ]
 
 [project.optional-dependencies]
