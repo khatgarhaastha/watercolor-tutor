@@ -13,6 +13,7 @@ The pause/resume rhythm within a run:
 
 import argparse
 import uuid
+from pathlib import Path
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
@@ -26,7 +27,9 @@ from .graph import compile_graph
 from .logging_config import configure_logging, get_logger
 from .observability import setup_tracing
 
-FEEDBACK_COMMAND = "/feedback"
+# Prefixes that signal an EXPLICIT feedback request (so a bad path errors helpfully
+# rather than being silently treated as a normal text reply).
+_FEEDBACK_PREFIXES = ("/feedback", "feedback ")
 
 
 def _initial_state() -> dict:
@@ -62,17 +65,23 @@ def _last_assistant_text(messages: list) -> str | None:
     return None
 
 
-def _parse_feedback_command(line: str) -> tuple[str, str] | None:
-    """If `line` is a /feedback command, return (image_path, message); else None.
+def _parse_image_message(line: str) -> tuple[str, str] | None:
+    """If `line` references an existing, supported image file, return (path, message).
 
-    Usage: `/feedback <path> [optional message]`. Pure string parsing — the path
-    is validated separately so this stays trivially testable.
+    Recognizes a bare pasted path, `feedback <path>`, or `/feedback <path>` (with an
+    optional trailing message). The plausible-path guard — a token must expand to a
+    REAL file with a supported image extension — keeps ordinary text from ever being
+    misrouted to vision feedback.
     """
-    if not line.startswith(FEEDBACK_COMMAND):
-        return None
-    rest = line[len(FEEDBACK_COMMAND) :].strip()
-    path, _, message = rest.partition(" ")
-    return path, message.strip()
+    tokens = line.split()
+    for i, token in enumerate(tokens):
+        candidate = Path(token).expanduser()
+        if candidate.suffix.lower() in images.SUPPORTED_MEDIA_TYPES and candidate.is_file():
+            rest = tokens[:i] + tokens[i + 1 :]
+            if rest and rest[0].lower().lstrip("/") == "feedback":
+                rest = rest[1:]  # drop a leading 'feedback' / '/feedback' word
+            return str(candidate), " ".join(rest)
+    return None
 
 
 def _converse(graph: CompiledStateGraph, config: RunnableConfig, printed: int) -> None:
@@ -86,15 +95,21 @@ def _converse(graph: CompiledStateGraph, config: RunnableConfig, printed: int) -
         if not reply:
             continue
 
-        feedback = _parse_feedback_command(reply)
-        if feedback is not None:
-            path, message = feedback
+        # An image path (bare, or after 'feedback'/'/feedback') -> real vision
+        # feedback. Any other message -> the usual intent routing.
+        parsed = _parse_image_message(reply)
+        if parsed is not None:
+            path, message = parsed
             try:
-                images.load_image(path)  # validate now; show a friendly error if bad
+                images.load_image(path)  # validate (size/type) before sending
             except (ValueError, OSError) as exc:
                 print(f"\nCouldn't use that image: {exc}")
                 continue
             resume: object = {"text": message, "image_path": path}
+        elif reply.lower().lstrip().startswith(_FEEDBACK_PREFIXES):
+            # Explicit feedback request, but no usable image was found at that path.
+            print("\nCouldn't find a usable image there. Try /feedback <path> (jpg/png/webp/gif).")
+            continue
         else:
             resume = reply
 
@@ -102,7 +117,7 @@ def _converse(graph: CompiledStateGraph, config: RunnableConfig, printed: int) -
         state = graph.invoke(Command(resume=resume), config=config)
         printed = _print_new_assistant_messages(state["messages"], printed)
 
-    print("\n🎉 That's your first watercolor lesson — happy painting!")
+    print("\n🎉 That's a wrap on your first watercolor lesson — you did it! Happy painting!")
 
 
 def main() -> None:

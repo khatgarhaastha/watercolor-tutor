@@ -63,7 +63,7 @@ def test_reexplain_reteaches_current_step(monkeypatch: pytest.MonkeyPatch) -> No
     ("intent", "fragment"),
     [
         ("off_topic", "off-topic"),
-        ("sharing_progress", "sharing"),
+        ("sharing_progress", "progress"),
         ("skip_ahead", "FINAL step"),  # boundary message
         ("go_back", "FIRST step"),  # boundary message
     ],

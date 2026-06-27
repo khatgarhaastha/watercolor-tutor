@@ -33,10 +33,10 @@ SYSTEM_PROMPT = (
     "if you must use a term, explain it simply.\n"
     f"This is a fixed {TOTAL_STEPS}-step first lesson — {_LESSON_OUTLINE}. "
     f"There is no step beyond Step {TOTAL_STEPS}; never invent or reference a later "
-    "step. On any step before the last, end by inviting the learner to ask a "
-    f"question or say they're ready to continue. On Step {TOTAL_STEPS} (the last "
-    "one), after teaching, congratulate them on finishing their first lesson and "
-    "invite any final questions — do not point them toward a next step.\n"
+    "step. Do NOT declare the lesson complete or celebrate finishing "
+    "mid-conversation — the lesson simply ends after the final step. On any step, "
+    "end by inviting the learner to ask a question or to tell you when they're "
+    "ready to continue.\n"
     "At most once or twice in the WHOLE lesson (never every turn), you may casually "
     "mention the learner can ask to see a reference image of what's being taught."
 )
@@ -59,8 +59,9 @@ STEP_PROMPTS: dict[int, str] = {
         "Teach Step 3 — Your first simple wash. This is the FINAL step of the "
         "lesson. Walk them through painting a flat wash: mixing paint with water, "
         "loading the brush, and laying smooth overlapping strokes from top to "
-        "bottom. Remind them to let it dry flat. Then congratulate them on "
-        "completing their first watercolor lesson — do not mention any further step."
+        "bottom. Remind them to let it dry flat. Encourage them to give it a try, "
+        "and invite them to ask questions or tell you when they're done. Do NOT "
+        "announce that the lesson is finished yet, and do not mention any further step."
     ),
 }
 
@@ -116,8 +117,10 @@ RESPONSE_INSTRUCTIONS: dict[str, str] = {
         "acknowledge it, then gently steer them back to the current step."
     ),
     "sharing_progress": (
-        "They're sharing what they painted or how it's going. Respond with "
-        "specific, warm encouragement, then invite them to continue when ready."
+        "They're describing their progress in words. Respond warmly and "
+        "encouragingly, but you have NOT seen any image — do NOT describe or "
+        "critique how their painting looks. If they'd like real feedback on it, "
+        "invite them to share it with /feedback <path>. Then invite them to continue."
     ),
     "skip_ahead": (
         "They want to skip ahead, but they're already on the FINAL step — there "
@@ -128,6 +131,13 @@ RESPONSE_INSTRUCTIONS: dict[str, str] = {
         "nothing before it. Reassure them warmly and carry on with this step."
     ),
 }
+
+# Blanket guard for the `respond` node: it never loads an image, so it must never
+# invent or critique visual details of the learner's painting (defensive against
+# confabulated feedback — real vision lives in the vision_feedback node).
+RESPOND_NO_VISION_GUARD = (
+    "You have not seen any image; do not describe or critique how their painting looks."
+)
 
 # What to look for when giving vision feedback on each step's painting. This is
 # what anchors the critique to the CURRENT step instead of generic praise.

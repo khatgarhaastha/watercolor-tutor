@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from watercolor_tutor import llm
-from watercolor_tutor.__main__ import _parse_feedback_command
+from watercolor_tutor.__main__ import _parse_image_message
 from watercolor_tutor.nodes.vision_feedback import vision_feedback
 from watercolor_tutor.state import TutorState
 
@@ -85,10 +85,25 @@ def test_vision_feedback_is_step_anchored_and_clears_image(
 # --- CLI command parser ------------------------------------------------------
 
 
-def test_parse_feedback_command_extracts_path_and_message() -> None:
-    assert _parse_feedback_command("/feedback ~/wash.png looks ok?") == ("~/wash.png", "looks ok?")
-    assert _parse_feedback_command("/feedback ~/wash.png") == ("~/wash.png", "")
+def test_parse_image_message_detects_paths_in_any_form(tmp_path: Path) -> None:
+    image = tmp_path / "wash.png"
+    image.write_bytes(PNG_1X1)
+    p = str(image)
+
+    # A bare pasted path, with no command word.
+    assert _parse_image_message(p) == (p, "")
+    # "feedback <path>" (no slash) — the original bug.
+    assert _parse_image_message(f"feedback {p}") == (p, "")
+    # "/feedback <path> <message>".
+    assert _parse_image_message(f"/feedback {p} does this look smooth?") == (
+        p,
+        "does this look smooth?",
+    )
+    # A bare path with surrounding words still resolves to the image.
+    assert _parse_image_message(f"{p} is this ok") == (p, "is this ok")
 
 
-def test_parse_feedback_command_ignores_normal_text() -> None:
-    assert _parse_feedback_command("what brush should I use?") is None
+def test_parse_image_message_ignores_non_images(tmp_path: Path) -> None:
+    assert _parse_image_message("what brush should I use?") is None
+    # A path-shaped string that isn't a real file must NOT be treated as an image.
+    assert _parse_image_message(str(tmp_path / "does-not-exist.png")) is None
