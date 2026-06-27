@@ -41,6 +41,7 @@ class IntentResult(BaseModel):
         "off_topic",  # not about the lesson
         "sharing_progress",  # describes what they painted / how it's going
         "needs_web_info",  # wants current/external info (products to buy, prices, links)
+        "needs_reference_image",  # wants to SEE an example/reference of the technique
     ] = Field(description="The single best label for the learner's latest reply.")
 
 

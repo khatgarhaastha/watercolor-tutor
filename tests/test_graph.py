@@ -198,6 +198,32 @@ def test_needs_web_info_routes_to_web_search(
     assert graph.get_state(config).next  # paused again
 
 
+def test_needs_reference_image_routes_to_reference(
+    initial_state: TutorState, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 'needs_reference_image' reply routes to the reference node, stays on-step.
+
+    The image MCP seam is stubbed — the real server is never launched in tests.
+    """
+    monkeypatch.setattr("watercolor_tutor.llm.generate", lambda *_: "REFERENCE REPLY")
+    monkeypatch.setattr(
+        "watercolor_tutor.classifier.classify_intent", lambda _t: "needs_reference_image"
+    )
+    monkeypatch.setattr(
+        "watercolor_tutor.mcp_search.image_search", lambda *a, **k: "1. Demo\n   URL: http://x"
+    )
+
+    graph = compile_graph()
+    config: RunnableConfig = {"configurable": {"thread_id": "ref"}}
+    graph.invoke(initial_state, config=config)  # teach step 1, pause
+
+    state = graph.invoke(Command(resume="can I see an example of a wash?"), config=config)
+    contents = [_content(m) for m in state["messages"]]
+    assert any("REFERENCE REPLY" in c for c in contents)  # reference synthesis appended
+    assert state["step"] == 1  # stayed on the current step
+    assert graph.get_state(config).next  # paused again
+
+
 def test_vision_feedback_flow(
     initial_state: TutorState, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

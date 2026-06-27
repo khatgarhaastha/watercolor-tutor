@@ -1,18 +1,18 @@
-"""MCP client — consume an external web-search MCP server (the CLIENT side of MCP).
+"""MCP client — consume external search MCP servers (the CLIENT side of MCP).
 
-Our agent acts as an MCP client here. Over the stdio transport it launches the
-configured search server as a subprocess, performs the MCP handshake, then:
-  1. DISCOVER — `session.list_tools()` (the server advertises its tools); we use
-     the `search` tool the DuckDuckGo server exposes.
-  2. CALL     — `session.call_tool("search", {"query": ...})`.
-  3. CONSUME  — parse the returned `CallToolResult` (a formatted text block).
+Our agent is a MULTI-SERVER MCP client here. Over the stdio transport it launches
+a configured search server as a subprocess, performs the MCP handshake, then
+DISCOVERS/CALLS/CONSUMES a tool. Two servers, two purposes:
+  - web_search()   -> the text server's `search` tool (3b-1): live/buyable info.
+  - image_search() -> the image server's `ddg-image-search` tool (3b-2): visual
+    references, with a graceful fall back to that server's `ddg-text-search` for
+    reference *page* links when the image endpoint is rate-limited (DuckDuckGo
+    throttles images aggressively).
 
-Because we speak MCP, the server is swappable: DuckDuckGo (no key) today, a keyed
-Tavily/Brave server later — without changing this seam or any node.
-
-`web_search()` is the seam the rest of the app sees. Tests stub it, so the real
-server is NEVER launched in the suite. It also NEVER raises: any failure (server
-missing, timeout, tool error) returns "" so the calling node degrades gracefully.
+Because we speak MCP, each server is swappable via config without touching nodes.
+The public functions are the seam tests stub, so the real servers are NEVER
+launched in the suite. They NEVER raise: disabled or all-failed -> "" so the
+calling node degrades gracefully.
 """
 
 import asyncio
@@ -28,14 +28,11 @@ from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# The tool name the DuckDuckGo MCP server advertises (discovered via list_tools).
-SEARCH_TOOL = "search"
-
 
 def _resolve_command(command: str) -> str:
     """Resolve a bare server command to a launchable path.
 
-    Prefer the executable next to the current interpreter (our venv's bin), so the
+    Prefer the executable next to the current interpreter (our venv's bin) so the
     subprocess launches regardless of PATH; fall back to a PATH lookup, then the
     bare name.
     """
@@ -45,18 +42,21 @@ def _resolve_command(command: str) -> str:
     return shutil.which(command) or command
 
 
-async def _search_async(command: str, query: str, max_results: int) -> str:
-    """Connect to the MCP server over stdio, call its search tool, return text."""
+async def _call_tool_async(command: str, tool_name: str, arguments: dict) -> str:
+    """Launch the MCP server `command`, call `tool_name`, return its text content.
+
+    This is the generalized discover→call→consume core, reused by every search
+    function. Raises on a tool error so callers can fall back / degrade.
+    """
     params = StdioServerParameters(command=_resolve_command(command), args=[])
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()  # MCP handshake
-            result = await session.call_tool(
-                SEARCH_TOOL, {"query": query, "max_results": max_results}
-            )
+            result = await session.call_tool(tool_name, arguments)
             if getattr(result, "isError", False):
-                raise RuntimeError("search tool reported an error")
-            # The DuckDuckGo server returns the results as text content block(s).
+                raise RuntimeError(f"{tool_name} reported an error")
+            # Keep only text blocks (titles/links/snippets); ignore any binary
+            # image blocks — we link to references, never reproduce them.
             return "\n".join(
                 getattr(block, "text", "")
                 for block in result.content
@@ -65,18 +65,45 @@ async def _search_async(command: str, query: str, max_results: int) -> str:
 
 
 def web_search(query: str, max_results: int = 5) -> str:
-    """Search the web via the MCP server; return formatted results text.
-
-    The swappable seam. A synchronous wrapper around the async MCP client (a fresh
-    connection per search — fine for a CLI). Returns "" if search is disabled or on
-    ANY failure, so routing/teaching never crashes on a flaky external server.
-    """
+    """Live web search via the text MCP server. "" if disabled or on any failure."""
     settings = get_settings()
     if not settings.web_search_enabled:
         logger.info("web search disabled via config")
         return ""
     try:
-        return asyncio.run(_search_async(settings.mcp_search_command, query, max_results))
+        return asyncio.run(
+            _call_tool_async(
+                settings.mcp_search_command, "search", {"query": query, "max_results": max_results}
+            )
+        )
     except Exception as exc:  # never let a flaky external server crash the agent
         logger.warning("web search failed (%s); degrading gracefully", exc)
+        return ""
+
+
+def image_search(query: str, max_results: int = 5) -> str:
+    """Reference search via the image MCP server, resilient to image rate-limits.
+
+    Tries `ddg-image-search` first (real image references). DuckDuckGo throttles
+    its image endpoint aggressively, so on failure we fall back to the same
+    server's `ddg-text-search` for reference *page* links. Returns "" only if
+    disabled or BOTH attempts fail — so the reference node always degrades cleanly.
+    """
+    settings = get_settings()
+    if not settings.image_search_enabled:
+        logger.info("image search disabled via config")
+        return ""
+
+    command = settings.mcp_image_command
+    args = {"keywords": query, "max_results": max_results}
+
+    try:
+        return asyncio.run(_call_tool_async(command, "ddg-image-search", args))
+    except Exception as exc:
+        logger.warning("image search failed (%s); falling back to text reference search", exc)
+
+    try:
+        return asyncio.run(_call_tool_async(command, "ddg-text-search", args))
+    except Exception as exc:
+        logger.warning("reference text fallback failed (%s); degrading gracefully", exc)
         return ""

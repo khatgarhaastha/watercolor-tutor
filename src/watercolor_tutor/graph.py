@@ -14,11 +14,13 @@ Current shape (v2, full intent set + vision feedback):
         skip_ahead     -> advance   (or respond, if already on the last step)
         go_back        -> go_back    (or respond, if already on the first step)
         confused       -> reexplain
-        needs_web_info -> web_search   (live info via the MCP client)
+        needs_web_info -> web_search   (live info via the text MCP client)
+        needs_reference_image -> reference  (visual example via the image MCP client)
         question,both  -> answer
         off_topic, sharing_progress -> respond
     answer  -[route_after_answer]-> both -> advance/END | question -> await_learner
-    advance/go_back -> teach    reexplain/respond/vision_feedback/web_search -> await_learner
+    advance/go_back -> teach
+    reexplain/respond/vision_feedback/web_search/reference -> await_learner
 
 `vision_feedback` looks at a shared image in the context of the current step. The
 image's presence (set by await_learner from a /feedback command) is the routing
@@ -36,6 +38,7 @@ from .nodes.await_learner import await_learner
 from .nodes.classify import classify
 from .nodes.go_back import go_back
 from .nodes.reexplain import reexplain
+from .nodes.reference import reference
 from .nodes.respond import respond
 from .nodes.teach import teach
 from .nodes.vision_feedback import vision_feedback
@@ -63,6 +66,7 @@ def build_graph() -> StateGraph:
     builder.add_node("respond", respond)
     builder.add_node("vision_feedback", vision_feedback)
     builder.add_node("web_search", web_search)
+    builder.add_node("reference", reference)
 
     builder.add_edge(START, "welcome")
     builder.add_edge("welcome", "teach")
@@ -89,6 +93,7 @@ def build_graph() -> StateGraph:
             "reexplain": "reexplain",
             "respond": "respond",
             "web_search": "web_search",
+            "reference": "reference",
             "end": END,
         },
     )
@@ -108,6 +113,7 @@ def build_graph() -> StateGraph:
     builder.add_edge("respond", "await_learner")
     builder.add_edge("vision_feedback", "await_learner")
     builder.add_edge("web_search", "await_learner")
+    builder.add_edge("reference", "await_learner")
     return builder
 
 

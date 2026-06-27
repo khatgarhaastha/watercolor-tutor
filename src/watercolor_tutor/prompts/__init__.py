@@ -36,7 +36,9 @@ SYSTEM_PROMPT = (
     "step. On any step before the last, end by inviting the learner to ask a "
     f"question or say they're ready to continue. On Step {TOTAL_STEPS} (the last "
     "one), after teaching, congratulate them on finishing their first lesson and "
-    "invite any final questions — do not point them toward a next step."
+    "invite any final questions — do not point them toward a next step.\n"
+    "At most once or twice in the WHOLE lesson (never every turn), you may casually "
+    "mention the learner can ask to see a reference image of what's being taught."
 )
 
 # What the tutor should cover at each step. The `teach` node sends the matching
@@ -87,8 +89,12 @@ INTENT_SYSTEM_PROMPT = (
     "- 'needs_web_info': wants CURRENT or EXTERNAL info the lesson can't cover — "
     "specific products/paint sets/brushes/paper to BUY, prices, where to buy, or "
     "recent online tutorials (e.g. 'what's a good cheap beginner set to buy?', "
-    "'how much is cold-press paper?'). NOT for technique how-to questions (those "
-    "are 'question').\n"
+    "'how much is cold-press paper?').\n"
+    "- 'needs_reference_image': wants to SEE an example or reference of the "
+    "technique (e.g. 'show me what a good wash looks like', 'can I see an example?').\n"
+    "Three-way distinction: a technique how-to question is 'question' (answered "
+    "from the lesson); wanting to BUY something or current prices is 'needs_web_info'; "
+    "wanting to SEE an example is 'needs_reference_image'.\n"
     "First give one brief sentence of reasoning, then the intent label."
 )
 
@@ -166,4 +172,31 @@ WEB_SEARCH_UNAVAILABLE = (
     "live results right now, then give the best general guidance you can from your "
     "own knowledge, and suggest they verify current specifics (prices, products) "
     "themselves."
+)
+
+# Step-anchored, BEGINNER-AIMED reference-image queries (v2 Slice 3b-2). Built per
+# step (not from the learner's literal words) so results skew toward teaching
+# references rather than gallery masterpieces or product photos.
+REFERENCE_QUERIES: dict[int, str] = {
+    1: "beginner watercolor supplies and palette setup example",
+    2: "beginner watercolor brush control thin and thick strokes example",
+    3: "beginner watercolor flat wash technique example",
+}
+
+# Instruction for the reference node: the LLM does METADATA FILTERING over the raw
+# results — picking beginner-appropriate references and skipping the rest — and
+# frames them honestly (search results, not curated). Copyright: links only.
+REFERENCE_SELECTION_PREAMBLE = (
+    "These are web search results for a reference the learner asked to see. Pick "
+    "the 1-2 MOST APPROPRIATE for an absolute beginner learning this step: prefer "
+    "clear technique demonstrations or tutorials; SKIP finished masterpieces, art "
+    "that's for sale, products, and anything unrelated. Present each chosen one as "
+    "a one-line description plus its source link (do not reproduce the artwork), and "
+    "be honest that these are search results you found, not curated/verified. If "
+    "none look suitable, say so and suggest they search the query themselves."
+)
+REFERENCE_UNAVAILABLE = (
+    "Reference image search is currently unavailable. Tell the learner you couldn't "
+    "fetch a reference right now, and suggest they search the web for the query "
+    "themselves (e.g. on an image-search site)."
 )

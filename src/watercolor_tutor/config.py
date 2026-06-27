@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     web_search_enabled: bool = Field(True, alias="WATERCOLOR_WEB_SEARCH")
     mcp_search_command: str = Field("duckduckgo-mcp-server", alias="WATERCOLOR_MCP_SEARCH_COMMAND")
 
+    # Reference-image search via a SECOND (image) MCP server (v2 Slice 3b-2).
+    image_search_enabled: bool = Field(True, alias="WATERCOLOR_IMAGE_SEARCH")
+    mcp_image_command: str = Field("ddg-mcp", alias="WATERCOLOR_MCP_IMAGE_COMMAND")
+
 
 @lru_cache
 def get_settings() -> Settings:

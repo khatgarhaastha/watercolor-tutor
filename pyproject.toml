@@ -29,6 +29,9 @@ dependencies = [
     # server. duckduckgo-mcp-server is the no-key default; swappable via config.
     "mcp>=1.2",
     "duckduckgo-mcp-server>=0.4",
+    # Image-search MCP server (v2 Slice 3b-2) — no-key reference images; makes the
+    # agent a MULTI-server MCP client. Swappable via config.
+    "ddg-mcp>=0.1",
 ]
 
 [project.optional-dependencies]

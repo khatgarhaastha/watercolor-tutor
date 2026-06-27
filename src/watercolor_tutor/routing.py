@@ -121,7 +121,9 @@ def route_after_reply(state: TutorState) -> Literal["classify", "vision_feedback
 
 def route_after_input(
     state: TutorState,
-) -> Literal["answer", "advance", "go_back", "reexplain", "respond", "web_search", "end"]:
+) -> Literal[
+    "answer", "advance", "go_back", "reexplain", "respond", "web_search", "reference", "end"
+]:
     """Decide where to go after the learner replies (the first conditional edge).
 
     Pure: reads only state["intent"] and state["step"]. This is also where the
@@ -147,6 +149,8 @@ def route_after_input(
         return "reexplain"  # re-teach the current step differently
     if intent == "needs_web_info":
         return "web_search"  # fetch live/external info via the MCP client
+    if intent == "needs_reference_image":
+        return "reference"  # fetch a step-anchored reference via the image MCP client
     if intent in ("question", "both"):
         return "answer"
 

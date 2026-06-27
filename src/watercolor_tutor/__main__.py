@@ -157,7 +157,10 @@ def main() -> None:
             # New (or already-finished) session: start the lesson fresh.
             state = graph.invoke(_initial_state(), config=config)
             printed = _print_new_assistant_messages(state["messages"], 0)
-            print("\n(Tip: share your painting for feedback with  /feedback <path-to-image>)")
+            print(
+                "\n(Tips: share your painting with  /feedback <path>  ·  "
+                "or ask to see a reference, e.g. 'can I see an example of a wash?')"
+            )
 
         _converse(graph, config, printed)
 
